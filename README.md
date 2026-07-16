@@ -24,10 +24,10 @@ This will be my first step into self-hosting an LLM and in-depth LLM usage.
 ### Summary
 In a bid to take my data offline, I have created this idea for a self-hostable password manager. The idea is that the data is stored in a database and served to the site by an API. The site and API are only accessible from approved devices.
 
-## Notes
+### Notes
 This is my first step into coding data encryption through the use of existing libraries.
 
-## Self-Hosted LLM
+### Self-Hosted LLM
 LLMs like Claude are a useful tool for a developer to have in their toolbox. Due to data and environmental impact concerns, I have created this idea to host an LLM at home to use as my personal coding agent. It will only be accessible on approved devices through device registration. The plan is to make this as cost-effective but usable as possible, not compete with the likes of Claude and ChatGPT.
 
 ## Virtual Assistant
