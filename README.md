@@ -1,7 +1,10 @@
 # Projects
-These are projects that I have planned out to work on at a later date. They are all primarily for the purpose of personal development. Any projects that I intend to sell will have "(£)" in the title. All these plans are subject to copyright. Copyright © 2026 Toby Hunter, All rights reserved.
+These are projects that I have planned out to work on at a later date. They are all primarily for the purpose of personal development. Any projects that I intend to sell will have "(£)" in the title. All these plans are subject to copyright. Copyright © 2026 Toby Hunter. All rights reserved.
 
-**This was last updated on the 19/07/2026**
+**This was last updated on the 18/07/2026**
+
+## Wiki Site
+Thought of having found limitations when working with WordPress that prevented me from setting up a wiki site the way I wanted. So, I designed this project to allow me to create a wiki site structured the way I want with the features I want. It will read data from the API and display it to the user with categories created in the API accompanied with media uploaded in the API.
 
 ## Blackbox
 ### Summary
@@ -61,4 +64,4 @@ This is an arcade-style game based on the dice game Farkle. It features ranked/o
 - No Chat
 
 ### Notes
-While this is currently intended to be sold for between £2.5 and £5, that may change following discussions with a Solicitor/Laywer on the legalities.
+While this is currently intended to be sold for between £2.5 and £5, that may change following discussions with a Solicitor/Lawyer on the legalities.
