@@ -3,6 +3,9 @@ These are projects that I have planned out to work on at a later date. They are 
 
 **This was last updated on the 11/08/2026**
 
+## Linux Compat
+Where it makes sense, I am going to make existing applications that are not compatable with Linux, compatable. This excludes any project specifically designed with windows in mind like the Google Drive Sync.
+
 ## Server Backup Tool
 ### API
 This is an idea to allow remote monitoring and control over the server backup tool that allows self hosting game servers to have automated backups at a configurable time. It will expose the log messages to a caller authenticated with a client id and secret. It will also allow authenticated users to send a command to the API which is then picked up and processed by the tool, either sending it to the game server or running it itself.
