@@ -1,7 +1,14 @@
 # Projects
 These are projects that I have planned out to work on at a later date. They are all primarily for the purpose of personal development. Any projects that I intend to sell will have "(£)" in the title. All these plans are subject to copyright. Copyright © 2026 Toby Hunter. All rights reserved.
 
-**This was last updated on the 18/07/2026**
+**This was last updated on the 11/08/2026**
+
+## Server Backup Tool
+### API
+This is an idea to allow remote monitoring and control over the server backup tool that allows self hosting game servers to have automated backups at a configurable time. It will expose the log messages to a caller authenticated with a client id and secret. It will also allow authenticated users to send a command to the API which is then picked up and processed by the tool, either sending it to the game server or running it itself.
+
+### Installer
+This idea is to make configuration and setup of the suite easier. It will allow a user to install the SBT and go through the complex configuration in a user friendly manner. If you select the API install, it will go through that configuration process also. The installer will also have an option to update, uninstall or edit configuration details so the user doesn't have to manually update binaries.
 
 ## Wiki Site
 Thought of having found limitations when working with WordPress that prevented me from setting up a wiki site the way I wanted. So, I designed this project to allow me to create a wiki site structured the way I want with the features I want. It will read data from the API and display it to the user with categories created in the API accompanied with media uploaded in the API.
