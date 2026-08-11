@@ -595,6 +595,75 @@ At a £2.50 sale price under the small business programmes:
 - However, the random reward system (special AI dice encounters) should be monitored against evolving regulations, particularly in Belgium, the Netherlands, and under any future UK legislation on random reward mechanics in games
 - As long as custom dice cannot be traded, sold, or converted to real-world value, the risk is low
 
+### UK Age Appropriate Design Code (Children's Code)
+
+A PEGI 3 or PEGI 7 rating means the game is "likely to be accessed by children," which brings the full ICO Children's Code into scope. This goes beyond standard privacy policy requirements:
+
+- **High privacy by default** for under-18 users
+- **No nudge techniques** that encourage children to weaken privacy settings or provide more data — the donation prompt must not be shown to children or must be carefully reviewed against this requirement
+- **Data Protection Impact Assessment** is mandatory (not optional) when children are likely users
+- **Age assurance mechanisms** may be required to estimate user age and apply appropriate protections
+- **Detrimental use of data**: data collected from children must not be used in ways that are detrimental to their wellbeing
+- Consider whether the dice collection system (random rewards from AI encounters) could be viewed as encouraging compulsive behaviour in children
+
+### Consumer Rights Act 2015
+
+Selling digital content to UK consumers triggers statutory obligations:
+
+- Digital content must be of **satisfactory quality, fit for purpose, and as described**
+- The **14-day cooling-off period** for digital purchases applies unless the consumer explicitly waives it at point of sale
+- App stores handle some of this, but direct sales (e.g. via Steam keys or a website) require compliance independently
+- Refund policies must be clearly communicated and lawful
+
+### International Data Transfers (UK GDPR)
+
+The tech stack routes through Cloudflare and uses third-party payment processors (Stripe/PayPal), which may transfer personal data outside the UK:
+
+- **Adequate safeguards** must be in place under UK GDPR for any transfers outside the UK (e.g. Standard Contractual Clauses or reliance on adequacy decisions)
+- Cloudflare, Stripe, and PayPal all have US-based infrastructure — the transfer mechanisms must be documented
+- The Privacy Policy must disclose where data is processed and the safeguards in place
+
+### Open Source License Compliance
+
+- **Godot** is MIT licensed — the MIT license notice must be included in all distributed builds
+- All third-party libraries, assets, and tools must be audited for license compatibility before release
+- Some licenses (e.g. GPL) have copyleft requirements that could affect distribution if bundled incorrectly
+- Asset licenses (fonts, audio, textures) must permit commercial use
+
+### VAT on Digital Services
+
+Selling a game across borders triggers VAT obligations:
+
+- **UK VAT** registration is required once revenue exceeds the threshold (currently £90,000)
+- **EU VAT** is due in the buyer's country from the first sale — the One Stop Shop (OSS) scheme simplifies reporting
+- App stores (Apple, Google, Steam) typically handle VAT collection on behalf of developers, but this must be confirmed per platform
+- Donations accepted directly (outside app stores) may also attract VAT depending on how they are classified — consult an accountant
+
+### Online Safety Act 2023
+
+Even without chat or messaging, the game may fall partially within scope:
+
+- **Display names** visible to other players are a form of user-generated content
+- If chat, messaging, or any other user-generated content is added in future, the game would likely be in scope for Ofcom's codes of practice
+- Content moderation for display names (profanity filtering, offensive name detection) should be implemented for online play
+- Plan for compliance before adding any communication features
+
+### Accessibility (Equality Act 2010)
+
+- The Equality Act 2010 requires **reasonable adjustments** for disabled users of services
+- App stores are increasingly enforcing accessibility guidelines (e.g. Apple's Human Interface Guidelines, Google's accessibility requirements)
+- Consider colour-blind modes, scalable UI text, screen reader compatibility, and alternative input support
+- Accessibility is also a factor in PEGI/IARC age rating submissions
+
+### Anti-Cheat & Data Protection
+
+The offline anti-cheat system (see Anti-Cheat section) involves profiling player behaviour, which has UK GDPR implications:
+
+- Automated decision-making that significantly affects a player (e.g. flagging, restricting, or banning) requires a **lawful basis and transparency**
+- Players have the right to **not be subject to solely automated decisions** with significant effects — the "flagging not blocking" approach mitigates this, but manual review must genuinely occur
+- The anti-cheat data collection and profiling must be disclosed in the Privacy Policy
+- Players should be informed if their account is flagged and given an opportunity to challenge the decision
+
 ### Recommended Actions Before Launch
 
 1. Choose an original game name and check trademark availability
@@ -605,6 +674,13 @@ At a £2.50 sale price under the small business programmes:
 6. Complete age rating classification (PEGI / IARC)
 7. Review Apple and Google's in-app donation and payment policies for compliance
 8. Ensure GDPR-compliant consent flows are built into account creation
+9. Conduct a Children's Code assessment and implement age-appropriate design measures
+10. Audit all open-source and third-party asset licenses and include required notices in builds
+11. Document international data transfer mechanisms for Cloudflare, Stripe, and PayPal
+12. Confirm VAT collection responsibilities per platform and register for OSS if selling to EU consumers
+13. Implement display name moderation (profanity filter, offensive name detection) for online play
+14. Disclose anti-cheat profiling and automated decision-making in the Privacy Policy
+15. Review accessibility requirements and implement reasonable adjustments (colour-blind mode, scalable text)
 
 ---
 
