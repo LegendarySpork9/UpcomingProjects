@@ -33,6 +33,7 @@
 29. [Code Standards and Project Structure](#29-code-standards-and-project-structure)
 30. [Build Order / Roadmap](#30-build-order--roadmap)
 31. [Future: Car Assistant Edition](#31-future-car-assistant-edition)
+32. [Future: Droid Assistant Edition](#32-future-droid-assistant-edition)
 
 ---
 
@@ -1507,3 +1508,170 @@ Qwen 2.5 0.5B Q4 (~350 MB) for responsive interaction. Car commands need speed o
 ### Sibling Network
 
 The car assistant is a sibling like any other. Syncs with the family server when on home Wi-Fi.
+
+---
+
+## 32. Future: Droid Assistant Edition
+
+Purpose-built edition that uses a Galaxy's Edge Droid Depot droid as the physical interface. You speak to the droid, it processes via the assistant's skill system, and responds with movement, sounds, and head gestures instead of (or alongside) speech. The droid becomes a physical embodiment of a virtual assistant sibling.
+
+This edition is based on the Droid Brain project (see `droid-brain-design.md`). Where Droid Brain is a standalone personality engine, this edition integrates the droid into the full VirtualAssistant ecosystem — skills, memory, sibling network, and all.
+
+### How It Differs from Droid Brain
+
+| Aspect | Droid Brain (standalone) | Droid Assistant Edition |
+|---|---|---|
+| LLM purpose | Personality/mood decisions only | Full assistant — intent classification, skill execution, personality |
+| Skills | None — just ambient behaviour | Full VirtualAssistant skill system (weather, timers, reminders, Q&A, etc.) |
+| Memory | Simple mood state | Full VirtualAssistant memory system (user preferences, conversation history, learned knowledge) |
+| Siblings | Not connected | Full sibling on the family server network |
+| Identity | Droid character only | Named assistant with personality, interests, evolution — happens to inhabit a droid body |
+
+### Hardware
+
+Uses the same hardware as Droid Brain Tier 2 or Tier 3 (see `droid-brain-design.md` for full component lists and routes).
+
+| Component | Recommendation | Price |
+|---|---|---|
+| Compute | Raspberry Pi 5 (8 GB) for cloud LLM, or mini PC + GPU for local (see Droid Brain Tier 3 routes) | ~£90-700 (tier/route dependent) |
+| Bluetooth | USB Bluetooth 5.0 adapter | ~£8-12 |
+| Microphone | USB mini microphone | ~£10-15 |
+| Droid | Galaxy's Edge Droid Depot unit (R-unit, BB-unit, or BD-unit) | Already owned / ~£100-130 |
+| **Total (excluding droid)** | | **~£108-727** |
+
+### Interaction Model
+
+The droid edition is voice-in, action-out. You speak to it, it listens, processes via the assistant, and responds physically. A Telegram chat provides live "translations" of what the droid is saying.
+
+```
+┌──────────────┐     ┌───────────────────────────────┐     ┌───────────┐
+│  Microphone  │────▶│  VirtualAssistant Engine       │────▶│  Droid    │
+│              │     │                                │     │  (BLE)    │
+│  "What's the │     │  1. Whisper STT                │     │           │
+│   weather    │     │  2. LLM intent classification  │     │  Actions: │
+│   today?"    │     │  3. Skill execution (weather)  │     │  - Beeps  │
+│              │     │  4. Response mapping            │     │  - Moves  │
+└──────────────┘     │  5. Droid action translation   │     │  - Head   │
+                     │  6. Telegram translation sent  │     └───────────┘
+                     └──────────────┬────────────────┘
+                                    │
+                                    ▼
+                              ┌───────────┐
+                              │ Telegram   │
+                              │ Chat       │
+                              │            │
+                              │ "It's 22°C │
+                              │  and sunny │
+                              │  today!"   │
+                              └───────────┘
+```
+
+### Response Mapping
+
+The assistant's text responses are translated into droid actions. The droid can't speak English, so responses are conveyed through a combination of:
+
+**Emotive sounds:** The droid's response tone matches the content. Good news = happy beeps. Bad news = low concerned tones. Acknowledgement = short chirp.
+
+**Physical gestures:** Head nods for yes/acknowledgement. Head shake for no/negative. Head tilt for curiosity/thinking. Looking toward the speaker when listening.
+
+**Action sequences:** Complex responses become choreographed sequences — e.g. a weather report might be: alert beep (getting attention) → head turn to speaker → short pause → happy beeps (nice weather) or sad tones (rain). The LLM decides the emotional mapping.
+
+**Telegram translation:** Every interactive response is sent to a Telegram chat as a text "translation" of what the droid is saying. The message is written in the droid's personality voice — not a dry system output, but what it *would* say if it could speak. During a conversation you'd have the Telegram chat open, reading responses as they arrive like a live subtitle feed. The droid's physical reaction gives immediate emotional feedback, Telegram fills in the detail.
+
+```
+You: "Do I have any reminders?"
+                │
+  Droid: curious beep → head tilt → two quick chirps → nod
+                │
+  Telegram: "You've got two! Pick up the dry cleaning by 5pm,
+             and call mum back — she rang earlier."
+```
+
+Ambient behaviour (idle mood animations) does not generate Telegram messages by default — that would create constant noise. Ambient "thoughts" are logged to the activity dashboard instead and can be reviewed on demand.
+
+**Optional companion speaker:** For responses that need actual words (e.g. reading out a message, giving directions), a small speaker near the droid can play TTS audio via Piper. The droid animates alongside the speech — moving its head, making small sounds in the gaps, reacting to its own "words." This creates the illusion of the droid speaking through a translator. This is complementary to Telegram — the speaker gives immediate verbal feedback in the room, Telegram gives you a persistent log you can scroll back through.
+
+### Response Mapping Configuration
+
+```json
+{
+  "responseMapping": {
+    "acknowledgement": { "sound": "acknowledge", "head": "nod", "move": "none" },
+    "affirmative": { "sound": "happy", "head": "nod", "move": "none" },
+    "negative": { "sound": "sad", "head": "shake", "move": "none" },
+    "thinking": { "sound": "curious", "head": "tilt", "move": "none" },
+    "excited": { "sound": "happy", "head": "spin", "move": "forward_back" },
+    "alert": { "sound": "alert", "head": "snap_to_speaker", "move": "none" },
+    "error": { "sound": "scared", "head": "shake", "move": "backward" },
+    "greeting": { "sound": "greeting", "head": "nod", "move": "forward" },
+    "idle_listening": { "sound": "none", "head": "track_speaker", "move": "none" }
+  }
+}
+```
+
+### Skills (droid-specific)
+
+The droid edition has access to the full skill set but adds droid-specific skills and adapts how results are delivered.
+
+| Skill | Online needed | Droid response | Telegram output |
+|---|---|---|---|
+| Weather | Yes | Happy beeps (nice) or sad tones (rain) | Full forecast in personality voice |
+| Timers/reminders | No | Alert beeps + head movement when timer fires. Persistent until acknowledged. | Reminder text + what's due |
+| General Q&A | No (local LLM) | Thinking sounds while processing, then emotive response | Full answer text |
+| Smart home control | Yes | Acknowledge beep + nod when done. Sad tone if failed. | Confirmation or error detail |
+| Music playback | Yes | Excited beeps, body sway/dance movements while music plays | Track name + artist |
+| Messages (Telegram) | Yes | Alert sound for incoming. Droid reacts to content. | Message content in the same chat |
+| Ambient mode | No | Falls back to Droid Brain behaviour — mood-driven idle animations | Not sent (logged to dashboard) |
+| Droid status | No | Self-referential sounds | Battery, connection, personality chip info |
+
+### Ambient Mode Integration
+
+When not being spoken to, the droid falls back to Droid Brain ambient behaviour — the mood system, time-of-day profiles, and idle animations described in `droid-brain-design.md`. This means the droid is never just sitting still and dead between interactions. It lives.
+
+The ambient loop runs as a background service within the VirtualAssistant engine. When speech is detected, the ambient loop pauses, the assistant takes over for the interaction, and then ambient mode resumes after 30 seconds of silence.
+
+### Personality
+
+The droid edition uses the same personality system as other editions (personality.md, directives.md) but with droid-specific additions:
+
+```markdown
+You inhabit a physical droid body — an astromech unit. You experience the world
+through a microphone and express yourself through movement, sounds, and gestures.
+
+You cannot speak words. When you respond, you choose emotive actions that convey
+your meaning. You are expressive and animated — you use your whole body to
+communicate. Head turns, excited rocking, cautious retreats, happy spins.
+
+When a companion speaker is available, you can relay detailed information through
+it — but your physical reactions should always accompany and enhance the spoken
+words. React to your own speech as if you're adding commentary.
+```
+
+### Display
+
+No dedicated screen. The droid is the physical display, Telegram is the text display. Status is conveyed through the droid's behaviour, detailed responses through Telegram:
+
+| State | Droid behaviour | Telegram |
+|---|---|---|
+| Booting / connecting | Slow head scan, low idle sounds | "Waking up..." status message |
+| Ready / listening | Subtle idle movements, head oriented toward last sound | — |
+| Processing | Rapid quiet beeps, head tilts side to side | — |
+| Response | Emotive sounds + gestures matching content | Full text translation of response |
+| Error / disconnected | Sad low tone, head droops, no movement | Error details sent to chat |
+| Sleep mode | Completely still, very occasional quiet sound | "Going to sleep" status message |
+
+### Model
+
+Same model strategy as the main assistant, chosen by hardware tier:
+
+| Hardware | Model | Notes |
+|---|---|---|
+| Raspberry Pi 5 (cloud LLM) | Cloud API (Haiku 4.5 / Sonnet 4.6) | Needs internet. ~£1-8/month. |
+| Raspberry Pi 5 (local) | Qwen 2.5 3B Q4 | Basic intent classification. 5-15 tok/s. Usable but slow. |
+| Mini PC + GPU (local) | Qwen3 8B Q4 | Full assistant capability. ~40 tok/s. Recommended. |
+
+### Sibling Network
+
+The droid assistant is a full sibling. It has its own name, personality, interests, and participates in the sibling network like any other instance. Its physical embodiment as a droid is part of its identity — other siblings know it lives in a droid body, which shapes how they perceive and interact with it.
+
+Syncs with the family server when on the home network (always connected if the host device is on the home network, which it typically is since the droid lives at home).
