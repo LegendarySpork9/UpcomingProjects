@@ -1,7 +1,7 @@
 # Projects
 These are projects that I have planned out to work on at a later date. They are all primarily for the purpose of personal development. Any projects that I intend to sell will have "(£)" in the title. All these plans are subject to copyright. Copyright © 2026 Toby Hunter. All rights reserved.
 
-**This was last updated on the 11/08/2026**
+**This was last updated on the 07/10/2026**
 
 ## Linux Compat
 Where it makes sense, I am going to make existing applications that are not compatable with Linux, compatable. This excludes any project specifically designed with windows in mind like the Google Drive Sync.
@@ -55,6 +55,12 @@ At present, I have two main assistant types in mind: standalone and multi-device
 
 ### Notes
 There are many aspects of this project that will have me learning new things, specifically in the LLM world. While there are some features, such as the evolution of the assistant over time and the group chat feature, that seem excessive, it is there for the purpose of personal development.
+
+## Droid Brain
+Galaxy Edge Droids are a little useless outsite of the park which is a little disappointing due to the budget for these things. I have created this plan to make the droids more like those from the shows/movies by integrating them with an LLM, allowing you to communicate with it like the movies/shows.
+
+## Translation Site
+Translating English to fictional languages like Kryptonian or making it accented like German is complicated and in cases not easy to understand. This plan is to create a website where people can input English text and it will then translate that to the given language. This is a site that will hopefully help people to learn how to translate to other languages as it explains how it reached the translation.
 
 ## Bones and Brew (£)
 ### Summary
