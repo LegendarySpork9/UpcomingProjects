@@ -34,6 +34,7 @@ TypeScript/React frontend + Python/FastAPI backend. Rule-based translation engin
 │  │   ├── Context Confirmation Panel                 │
 │  │   ├── Output Panel (romanized + glyphs)          │
 │  │   ├── Breakdown Toggle (interlinear gloss)       │
+│  │   ├── Translation Reasoning Panel                │
 │  │   ├── Confidence Indicator                       │
 │  │   └── Feedback / Idiom Submit buttons            │
 │  └── Kryptonian Font (@font-face)                   │
@@ -140,6 +141,82 @@ Flow:
 - Hidden by default, "Show breakdown" toggle button
 - Displays interlinear gloss table (word | gloss)
 - Shows morpheme boundaries (prefix-stem-suffix)
+
+#### Translation Reasoning Panel
+- Hidden by default, "How was this translated?" toggle button
+- Shows a step-by-step trace of every decision the engine made to arrive at the translation
+- Each step is a collapsible section showing what happened and why
+
+Steps shown (per sentence):
+1. **Original English** — the raw input sentence
+2. **Idiom Processing** — any idioms detected and what they were rephrased to (or "No idioms detected")
+3. **NLP Parse** — the sentence parsed into roles: subject, verb, objects, adverbs, modifiers, with POS tags
+4. **Context Applied** — the gender, register, relationship, tense, and mood settings used and whether they were auto-detected or user-overridden
+5. **Dictionary Lookups** — for each word: the English word, the dictionary entry matched, the Kryptonese form selected, and any alternatives considered. Flags transliterated words with the reason ("not found in dictionary")
+6. **Grammar Rules Applied** — ordered list of every transformation:
+   - Word order: "Reordered SVO → VSO: [verb] [subject] [object]"
+   - Verb conjugation: "Applied present simple suffix -odh to stem throniv → thronivodh"
+   - Mood prefix: "Applied negation prefix zha- → zhathronivodh"
+   - Verb chaining: "Chained Type-2 zhatulem + Type-1 thronivu"
+   - Particle insertion: "Inserted complement marker /w/ before direct object"
+   - Possession: "Built alienable possessive: rrip → drop p → rri + tiv → rritiv (feminine, voiceless)"
+   - Gender shifting: "Shifted pronoun rraop → rrip (feminine, informal register)"
+   - Quantifier: "Applied plural suffix -o to skulev → skulevo"
+   - Proper noun: "Transliterated 'Alex' → ,alehks, (comma-delimited)"
+7. **Assembly** — the final ordered tokens assembled into the output string
+8. **Confidence Calculation** — breakdown of the confidence score: % dictionary hits, number of transliterations, number of idiom overrides, complexity factor
+
+Example output for "You don't have to hide secrets anymore, Alex.":
+```
+Step 1: Original English
+  "You don't have to hide secrets anymore, Alex."
+
+Step 2: Idiom Processing
+  "keep secrets" → rephrased to "hide secrets" (idiom table match)
+
+Step 3: NLP Parse
+  Subject: "You" (pronoun, 2nd person)
+  Verb: "don't have to hide" (negated obligation + infinitive)
+  Object: "secrets" (noun, plural)
+  Adverb: "anymore"
+  Vocative: "Alex" (proper noun)
+
+Step 4: Context Applied
+  Speaker gender: feminine (user-set)
+  Listener gender: feminine (user-set)
+  Register: informal (user-set)
+  Relationship: family (user-set)
+  Tense: present (auto-detected from "don't")
+  Mood: declarative (auto-detected)
+
+Step 5: Dictionary Lookups
+  "hide" → /throniv/ (v1: conceal, cover, hide, protect)
+  "secret" → /skulev/ (noun: enigma, mystery, secret)
+  "anymore" → /vahgem/ (adverb: again)
+  "Alex" → not in dictionary → transliterated: /,alehks,/
+  "have to" → mapped to /tulem/ (v2 pres.: need)
+
+Step 6: Grammar Rules Applied
+  1. Negation: "don't need" → prefix zha- to tulem → zhatulem
+  2. Verb chain: Type-2 zhatulem + Type-1 throniv
+     → throniv takes future simple -u (chained infinitive) → thronivu
+  3. Word order: VSO → zhatulem thronivu [subject] [complement]
+  4. Pronoun gender: register=informal, listener=feminine
+     → rraop shifted to rrip (row 1: ao→i)
+  5. Adverb placement: vahgem placed between verb and subject
+  6. Complement particle: /w/ inserted before direct object
+  7. Plural suffix: skulev + -o → skulevo
+  8. Proper noun: "Alex" → ,alehks, (phonetic transliteration)
+
+Step 7: Assembly
+  zhatulem thronivu vahgem rrip w skulevo ,alehks,
+
+Step 8: Confidence: HIGH
+  Dictionary hits: 4/5 (80%)
+  Transliterations: 1 (proper noun — expected)
+  Idiom overrides: 1 (from curated table)
+  Complexity: simple (single clause + vocative)
+```
 
 ### 4.3 Confidence Scoring
 
@@ -439,11 +516,21 @@ Flow for unrecognised idioms:
    │
 10. FONT MAPPING: Convert romanization → Kryptonian font characters
    │
-11. OUTPUT: Return JSON with:
+11. REASONING TRACE: Compile step-by-step log from all prior stages:
+   │  ├── Idiom matches and rephrasings
+   │  ├── NLP parse results (roles, POS tags)
+   │  ├── Context values used (auto vs user-set)
+   │  ├── Dictionary lookups (matched entries, transliterations)
+   │  ├── Each grammar rule applied in order with before/after
+   │  ├── Final assembly order
+   │  └── Confidence score breakdown
+   │
+12. OUTPUT: Return JSON with:
     ├── romanized Kryptonese text
     ├── Kryptonian font character string
     ├── confidence score
     ├── gloss table
+    ├── reasoning trace (per sentence)
     ├── transliteration notices
     └── any warnings/flags
 ```
@@ -512,7 +599,36 @@ Flow for unrecognised idioms:
     { "word": ",alehks,", "gloss": "Alex (proper noun)" }
   ],
   "notices": [],
-  "warnings": []
+  "warnings": [],
+  "reasoning": [
+    {
+      "sentence": "You don't have to hide secrets anymore, Alex.",
+      "steps": [
+        { "step": "idiom_processing", "detail": "\"keep secrets\" rephrased to \"hide secrets\" via idiom table" },
+        { "step": "nlp_parse", "detail": { "subject": "You", "verb": "don't have to hide", "object": "secrets", "adverb": "anymore", "vocative": "Alex" } },
+        { "step": "context", "detail": { "speaker_gender": "feminine (user-set)", "register": "informal (user-set)", "tense": "present (auto-detected)" } },
+        { "step": "dictionary_lookup", "words": [
+          { "english": "hide", "kryptonese": "throniv", "source": "dictionary", "type": "v1" },
+          { "english": "secret", "kryptonese": "skulev", "source": "dictionary", "type": "noun" },
+          { "english": "anymore", "kryptonese": "vahgem", "source": "dictionary", "type": "adverb" },
+          { "english": "Alex", "kryptonese": ",alehks,", "source": "transliteration", "type": "proper noun" },
+          { "english": "need", "kryptonese": "tulem", "source": "dictionary", "type": "v2" }
+        ]},
+        { "step": "grammar_rules", "rules_applied": [
+          "Negation: zha- + tulem → zhatulem",
+          "Verb chain: Type-2 zhatulem + Type-1 throniv-u (future simple)",
+          "Word order: VSO → zhatulem thronivu [subject] [complement]",
+          "Pronoun gender: rraop → rrip (feminine, informal)",
+          "Adverb placement: vahgem between verb and subject",
+          "Complement particle: /w/ before direct object",
+          "Plural: skulev + -o → skulevo",
+          "Proper noun: Alex → ,alehks,"
+        ]},
+        { "step": "assembly", "result": "zhatulem thronivu vahgem rrip w skulevo ,alehks," },
+        { "step": "confidence", "score": "high", "dictionary_hits": "4/5", "transliterations": 1, "idiom_overrides": 1 }
+      ]
+    }
+  ]
 }
 ```
 
@@ -635,6 +751,7 @@ Creates a GitHub issue via GitHub API with appropriate label.
 │  Confidence: ● High                      │
 │                                          │
 │  [Show Breakdown ▼]                      │
+│  [How was this translated? ▼]            │
 │                                          │
 │  ⚠ "internet" is not in the dictionary. │
 │  It has been phonetically transliterated │
@@ -723,6 +840,7 @@ lingua-ficta/
 │   │   │   ├── GlyphRenderer.tsx
 │   │   │   ├── BreakdownTable.tsx
 │   │   │   ├── ConfidenceIndicator.tsx
+│   │   │   ├── ReasoningPanel.tsx
 │   │   │   ├── IdiomOverrideBox.tsx
 │   │   │   ├── FeedbackModal.tsx
 │   │   │   └── TransliterationNotice.tsx
@@ -753,6 +871,7 @@ lingua-ficta/
 │   │   ├── idioms.py          # Idiom table lookup
 │   │   ├── confidence.py      # Confidence scoring
 │   │   ├── gloss.py           # Interlinear gloss generator
+│   │   ├── reasoning.py       # Translation reasoning trace builder
 │   │   ├── reverse.py         # Kryptonese → English pipeline
 │   │   └── font_mapper.py     # Romanization → font chars
 │   ├── data/
@@ -803,33 +922,35 @@ lingua-ficta/
 ### Phase 3: Output & UI
 16. Build confidence scorer
 17. Build gloss generator
-18. Build font character mapping (analyse .otf file)
-19. Build frontend translator page — input panel + context panel
-20. Build frontend output panel — romanized text + glyph rendering
-21. Build breakdown toggle component
-22. Build confidence indicator component
-23. Build transliteration notice component
+18. Build reasoning trace builder — instrument each engine step to log decisions into a structured trace object
+19. Build font character mapping (analyse .otf file)
+20. Build frontend translator page — input panel + context panel
+21. Build frontend output panel — romanized text + glyph rendering
+22. Build breakdown toggle component
+23. Build reasoning panel component ("How was this translated?" toggle with collapsible per-step sections)
+24. Build confidence indicator component
+25. Build transliteration notice component
 
 ### Phase 4: Reverse Translation
-24. Build Kryptonese → English morpheme tokenizer
-25. Build reverse grammar logic (VSO → SVO, deconjugation)
-26. Build font character → romanization decoder
-27. Wire into /api/reverse-translate endpoint
-28. Add direction toggle to frontend
+26. Build Kryptonese → English morpheme tokenizer
+27. Build reverse grammar logic (VSO → SVO, deconjugation)
+28. Build font character → romanization decoder
+29. Wire into /api/reverse-translate endpoint
+30. Add direction toggle to frontend
 
 ### Phase 5: Community Features
-29. Build idiom table lookup + override box UI
-30. Build GitHub issue creation API (idiom submissions)
-31. Build feedback modal + GitHub issue creation (translation feedback)
-32. Build advisory for multi-speaker detection
+31. Build idiom table lookup + override box UI
+32. Build GitHub issue creation API (idiom submissions)
+33. Build feedback modal + GitHub issue creation (translation feedback)
+34. Build advisory for multi-speaker detection
 
 ### Phase 6: Polish & Deploy
-33. Build home page with project info, credits, language explanation
-34. Responsive design / mobile support
-35. Error handling + edge cases
-36. Write tests for all engine components
-37. Set up Pi deployment (nginx, systemd, build pipeline)
-38. Seed idiom-table.json with common English idioms and their Kryptonese-compatible rephrases
+35. Build home page with project info, credits, language explanation
+36. Responsive design / mobile support
+37. Error handling + edge cases
+38. Write tests for all engine components
+39. Set up Pi deployment (nginx, systemd, build pipeline)
+40. Seed idiom-table.json with common English idioms and their Kryptonese-compatible rephrases
 
 ---
 
