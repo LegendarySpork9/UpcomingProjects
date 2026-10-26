@@ -245,7 +245,7 @@ Everything that goes to the API is stored in SQLite. The memory file contains wh
     "name": "Black Box",
     "created": "2026-05-19",
     "creator": "Toby Hunter",
-    "organisation": "Nurtur Limited",
+    "organisation": "Hunter Industries",
     "home": "Raspberry Pi 5, Toby's home network"
   },
   "entries": [
@@ -380,7 +380,7 @@ Every 15 minutes, Black Box checks open issues on GitHub. If closed:
 ### Two-Way Chat (App Bot Only)
 
 Webhook registered only for the app alerts bot. You can:
-- Ask questions: "How many issues for NurturCRM?"
+- Ask questions: "How many issues for MyApp?"
 - Give instructions: "Remember we're deploying v3 next Tuesday"
 - Suppress alerts: "Ignore Portal warnings for the next hour"
 - Get summaries: "What happened today?"
@@ -438,7 +438,7 @@ app.UseBlackBoxExceptionHandler();
 {
   "BlackBox": {
     "Endpoint": "https://blackbox.hunter-industries.co.uk",
-    "AppName": "NurturCRM",
+    "AppName": "MyApp",
     "AppVersion": "2.1.0",
     "ApiKey": ""
   }

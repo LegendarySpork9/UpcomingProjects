@@ -1,17 +1,20 @@
 # Projects
 These are projects that I have planned out to work on at a later date. They are all primarily for the purpose of personal development. Any projects that I intend to sell will have "(£)" in the title. All these plans are subject to copyright. Copyright © 2026 Toby Hunter. All rights reserved.
 
-**This was last updated on the 07/10/2026**
+**This was last updated on the 26/10/2026**
 
 ## Linux Compat
 Where it makes sense, I am going to make existing applications that are not compatable with Linux, compatable. This excludes any project specifically designed with windows in mind like the Google Drive Sync.
 
-## Server Backup Tool
+## Server Backup Tool (In Development)
 ### API
 This is an idea to allow remote monitoring and control over the server backup tool that allows self hosting game servers to have automated backups at a configurable time. It will expose the log messages to a caller authenticated with a client id and secret. It will also allow authenticated users to send a command to the API which is then picked up and processed by the tool, either sending it to the game server or running it itself.
 
 ### Installer
 This idea is to make configuration and setup of the suite easier. It will allow a user to install the SBT and go through the complex configuration in a user friendly manner. If you select the API install, it will go through that configuration process also. The installer will also have an option to update, uninstall or edit configuration details so the user doesn't have to manually update binaries.
+
+## AO3 Archive Scanner
+This Python project uses a users details and specified relationship tags to alert configured users when new fanfictions are added for that tag. An alert is sent in the form of an email with a breakdown of the fics added. It uses the office AO3 python client for the connection to the data and reading of the relationship tags.
 
 ## Wiki Site
 Thought of having found limitations when working with WordPress that prevented me from setting up a wiki site the way I wanted. So, I designed this project to allow me to create a wiki site structured the way I want with the features I want. It will read data from the API and display it to the user with categories created in the API accompanied with media uploaded in the API.
