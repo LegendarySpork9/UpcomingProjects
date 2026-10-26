@@ -34,6 +34,7 @@
 30. [Build Order / Roadmap](#30-build-order--roadmap)
 31. [Future: Car Assistant Edition](#31-future-car-assistant-edition)
 32. [Future: Droid Assistant Edition](#32-future-droid-assistant-edition)
+33. [Addon: Hologram Display](#33-addon-hologram-display)
 
 ---
 
@@ -441,9 +442,12 @@ At the end of each conversation (or periodically during long ones), the LLM revi
 
 | Urgency | Present (active) | Present (passive) | Focus mode | Away |
 |---|---|---|---|---|
-| Low | Speaks | UI notification | UI notification | Telegram message |
+| Low | Speaks | UI notification | Queued | Telegram message |
 | Medium | Speaks | Speaks | UI notification | Telegram message |
-| High/Urgent | Speaks | Speaks | Speaks | Phone call (SIP) |
+| High | Speaks | Speaks | Speaks | Phone call (SIP) |
+| Critical | Speaks immediately | Speaks immediately | Overrides focus mode, speaks | Phone call (SIP) + repeated |
+
+Critical urgency is reserved for genuine emergencies. It overrides focus mode unconditionally. The LLM content analysis layer can escalate to Critical (e.g. "your dad is in hospital"). Users can also mark specific skills or sources as Critical.
 
 ### Urgency Determination (three layers)
 
@@ -478,6 +482,81 @@ All preferences editable in the UI.
 |---|---|---|
 | Self-install (GitHub) | Anyone | Clone repo, run install wizard, set up themselves |
 | Distributed by Toby | Friends | Custom USB with pre-configured assistant |
+
+### Legal Considerations for Custom Content
+
+#### Custom 3D Models (Hologram Addon)
+
+Users may upload 3D avatar models for the hologram display, including models of copyrighted characters (e.g. Cortana from Halo, anime characters, game characters).
+
+**Project responsibility:**
+
+- The project ships with an original default avatar (3D KITT waveform) — no third-party IP
+- Custom model uploads are entirely the user's responsibility
+- During model upload, a one-time acknowledgement is required: the user confirms they have the right to use the model
+- VRM format includes built-in licence metadata (allowed usage, commercial use, redistribution) — the upload pipeline reads this and warns if the model's own metadata says redistribution isn't permitted
+
+**Creator distribution responsibility:**
+
+- If a creator distributes their assistant to others, the setup wizard flags custom models specifically
+- The creator must confirm they have distribution rights for any included custom avatar model
+- Distributed versions should only include original or appropriately licensed content
+
+**User private use (extracted game/media assets):**
+
+- Extracting models from games typically violates the game's EULA (reverse engineering/asset extraction is prohibited by most publishers including Microsoft)
+- May violate DMCA anti-circumvention provisions if files are encrypted or DRM-protected
+- A fair use argument for purely private, non-commercial, transformative use is plausible but untested in this specific context
+- No rights holder has ever pursued legal action against an individual for privately using extracted assets without distribution
+- Practical enforcement risk for purely private use is effectively nil
+- Risk increases significantly with any form of distribution, streaming, or commercial use
+
+#### Voice and TTS Models
+
+**Using original voice recordings from games/media:**
+
+- Copyrighted by the publisher — same grey area as model extraction
+- Voice actors have additional right of publicity protections over their voice (stronger in the US under California/Tennessee law, weaker in the UK)
+- Emerging legislation (Tennessee ELVIS Act, California AB 2602/AB 1836, proposed federal NO FAKES Act) strengthens voice performance protections
+- Using original recordings as training data for AI/TTS is legally riskier than simple playback
+
+**AI voice cloning of real actors:**
+
+- Legally risky under right of publicity laws, even for personal use
+- Landmark cases (Midler v. Ford 1988, Waits v. Frito-Lay 1992) established that deliberately imitating a distinctive, widely-known voice to sell a product is actionable
+- Not recommended for this project
+
+**Commissioning original voice performances (recommended approach):**
+
+- Hiring a voice actor to perform in the style/personality of a fictional character is legally defensible
+- Direct the actor toward the character's style and tone, not to clone the specific original actor
+- A voice itself is not copyrightable — copyright protects fixed recordings, not vocal qualities
+- Right of publicity protects real people, not fictional characters
+- The resulting TTS voice is an original performance by a different person
+
+**Contract requirements for commissioned voice work:**
+
+- Work-for-hire clause — commissioner owns the recordings outright
+- Explicit AI/TTS training consent — separate from the recording licence, clearly stating the recordings will be used to train a text-to-speech model
+- Defined scope of TTS model use
+- Separate compensation for AI training rights (industry range: £1,000-£10,000 for limited grants)
+- Redistribution terms — if the TTS voice ships with distributed versions, the contract must explicitly allow this
+- Revocation rights and data purging timeline
+
+**What the project must never do:**
+
+- Never include instructions for extracting copyrighted assets from games or media
+- Never ship copyrighted content from third parties
+- Never present custom content as officially affiliated with any IP holder
+- Never use trademarked character names (e.g. "KITT", "Cortana", "Knight Rider") in distributed product branding
+- Never use copyrighted dialogue from source material as recording scripts — write original lines
+
+#### UK vs US Legal Context
+
+- UK law does not recognise a standalone right of publicity — the primary recourse is "passing off" which requires proving implied endorsement and resulting damage
+- UK protections for voice actors are currently weaker than the US, though the "Save Our Voices Now" campaign (2026) is pushing for statutory voice protections
+- The project is UK-based — UK law applies to the project itself, but users in other jurisdictions are subject to their local laws
+- The README should note that legal considerations vary by jurisdiction and users should check their local laws
 
 ---
 
@@ -1675,3 +1754,367 @@ Same model strategy as the main assistant, chosen by hardware tier:
 The droid assistant is a full sibling. It has its own name, personality, interests, and participates in the sibling network like any other instance. Its physical embodiment as a droid is part of its identity — other siblings know it lives in a droid body, which shapes how they perceive and interact with it.
 
 Syncs with the family server when on the home network (always connected if the host device is on the home network, which it typically is since the droid lives at home).
+
+---
+
+## 33. Addon: Hologram Display
+
+Post-release addon that adds a holographic 3D avatar display to the assistant. The hologram sits on the user's desk and provides a visual embodiment of the assistant — a 3D character or waveform that animates in response to conversation, state changes, and notifications. This is an optional accessory, not a separate edition. It integrates into the existing Desktop and Multi-Device editions as an optional module.
+
+### Technology
+
+The hologram uses glasses-free light field displays — lenticular lens arrays that project multiple viewing angles simultaneously, creating a 3D image without headsets or glasses.
+
+The system is **display-agnostic**. It supports any compatible display through a render adapter layer, not locked to a single manufacturer. Three rendering ecosystems are supported:
+
+| Ecosystem | Rendering Approach | Displays | SDK |
+|---|---|---|---|
+| Looking Glass | Multi-view quilt (8-100 views rendered into a grid, lenticular lens splits them optically) | Looking Glass Go, 16", 27", HLD series | C#, C++, Unity, WebXR |
+| LeiaSR / Simulated Reality | Eye-tracked stereoscopic (2 views adjusted in real-time by eye tracking) | Samsung Odyssey 3D, Acer SpatialLabs, Lenovo ThinkVision 3D, Lume Pad 2 | C/C++, Unity, Unreal, OpenXR |
+| Sony XYN | Eye-tracked rendering (similar to LeiaSR, Sony's own SDK) | Sony ELF-SR1 (15.6"), ELF-SR2 (27") | C#, Unity, Unreal, OpenXR, DirectX |
+
+OpenXR is supported by LeiaSR and Sony as a cross-platform standard. Looking Glass uses its own Bridge SDK with native C# support.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│  VirtualAssistant Desktop App                       │
+│                                                     │
+│  ┌─────────────┐    ┌────────────────────────────┐  │
+│  │ State        │───▶│ Hologram Module             │  │
+│  │ Machine      │    │                            │  │
+│  │ (idle,       │    │  ┌──────────────────────┐  │  │
+│  │  listening,  │    │  │ 3D Scene (Stride)    │  │  │
+│  │  thinking,   │    │  │ - Avatar model       │  │  │
+│  │  speaking)   │    │  │ - Animation state    │  │  │
+│  └─────────────┘    │  │ - Lip sync driver    │  │  │
+│                      │  └──────────┬───────────┘  │  │
+│  ┌─────────────┐    │             │               │  │
+│  │ Piper TTS   │───▶│  ┌──────────▼───────────┐  │  │
+│  │ (audio +    │    │  │ Display Adapter Layer │  │  │
+│  │  phonemes)  │    │  │ ┌───────┐ ┌───────┐  │  │  │
+│  └─────────────┘    │  │ │ LG    │ │ LeiaSR│  │  │  │
+│                      │  │ │Adapter│ │Adapter│  │  │  │
+│  ┌─────────────┐    │  │ ├───────┤ ├───────┤  │  │  │
+│  │ MediaPipe   │───▶│  │ │ Sony  │ │Pepper │  │  │  │
+│  │ (head       │    │  │ │Adapter│ │Ghost  │  │  │  │
+│  │  tracking)  │    │  │ └───────┘ └───────┘  │  │  │
+│  └─────────────┘    │  └──────────────────────┘  │  │
+│                      └────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+          │                         │
+    ┌─────▼──────┐           ┌──────▼──────┐
+    │ ESP32      │           │ Holographic  │
+    │ (motor     │           │ Display      │
+    │  control)  │           │ (HDMI/USB-C) │
+    └────────────┘           └─────────────┘
+```
+
+The hologram display connects as a second display output (HDMI/USB-C). The desktop app detects the display via the relevant SDK and renders to it through the adapter layer. The motorised base (optional) communicates via USB serial to an ESP32 — same pattern as the Halo AI crystal.
+
+### Rendering Engine
+
+The hologram uses **Stride** (formerly Xenko) — an open-source, MIT-licensed C#/.NET game engine. Stride provides skeletal animation, blend shapes, model loading, and custom render pipelines natively within the .NET ecosystem. No licensing issues for distribution.
+
+The display adapter layer sits on top of Stride as a plugin — one adapter per ecosystem. The 3D scene code is shared across all adapters. The adapter handles the final output stage: rendering a multi-view quilt for Looking Glass/Alioscopy displays, or a tracked stereo pair for LeiaSR/Sony/OpenXR displays.
+
+### Preview Mode
+
+The hologram can render to a standard monitor in a preview window for development, testing, and previewing avatars without a holographic display. This allows:
+
+- Developers to build and test without hologram hardware
+- Users to preview uploaded avatar models before purchasing a display
+- Troubleshooting rendering issues on a standard screen
+
+Preview mode renders the 3D scene as a single flat viewport with orbit camera controls.
+
+### Avatar System
+
+#### Default Avatar
+
+The default avatar is a **3D KITT waveform** — the existing 2D waveform (coloured circle with reactive audio arcs) extended into 3D. The circle becomes an orb, the audio arcs ripple outward in 3D space. Low rendering cost, works on any hardware, maintains visual continuity with the desktop app.
+
+#### Custom Model Uploads
+
+Users can upload their own 3D avatar models. The system supports:
+
+| Format | Role | Notes |
+|---|---|---|
+| VRM | Primary/recommended | Purpose-built for avatars. Standardised humanoid rig, blend shapes, lip sync visemes, and licence metadata built into the spec. Recommended for character models. |
+| glTF | Secondary/advanced | Open standard, handles any model type. For non-humanoid models (robots, abstract forms, creatures) where VRM doesn't apply. Must bring own animations. |
+| FBX | Supported, not recommended | Accepted and converted internally. Proprietary format, harder to validate. |
+
+#### Animation System
+
+The animation system uses a **hybrid approach** — generic retargeted animations as the default, with custom animation overrides.
+
+**For humanoid models (VRM/standard rig):** A generic animation set ships with the project and is retargeted onto any compatible humanoid skeleton at runtime. This is the same approach used by VRChat and VTuber software. The user uploads a rigged model, the system auto-maps the bones, and the animations work automatically.
+
+**For models with custom animations:** Model creators can include custom animation clips for any state. Custom clips override the generic retargeted animations for that state.
+
+**For non-humanoid models:** Must provide their own animation clips, or the system falls back to simple transform animations (bob, rotate, scale pulse).
+
+#### Animation States
+
+| State | Generic Animation | Character Example |
+|---|---|---|
+| Appear | Materialise / flicker into existence | Holographic shimmer, assembles from particles |
+| Idle | Subtle movement loops (weight shift, look around, breathe) | Rock on feet, arms cross, glance around |
+| Listening | Attentive posture | Head tilt, lean forward, hands behind back |
+| Thinking | Processing posture | Hand on chin, look up, shift weight |
+| Speaking | Conversational gestures (multiple variations, randomly selected) | Hand waves, pointing, shrug, nod |
+| Acknowledge | Reaction to user response | Nod, small gesture |
+| Disappear | Dematerialise / flicker out | Dissolves, particles scatter |
+
+The system randomly selects from available clips per state and blends between them for natural variation. The assistant waits for user acknowledgement before disappearing — the nod-then-disappear is a real exchange, not an auto-dismiss.
+
+#### Lip Sync
+
+Piper TTS outputs audio. The system extracts phoneme timings or amplitude in real-time and drives facial blend shapes (mouth open/close, vowel shapes) on the model's face rig. Models with VRM-standard facial blend shapes (visemes) get automatic lip sync. Models without facial blend shapes fall back to body-gesture-only speech animations.
+
+#### Upload Validation Pipeline
+
+When a user uploads a custom model, the system runs:
+
+1. **File type verification** — confirm the file matches its claimed format, not just the extension
+2. **Security sanitisation** — strip external URI references (all textures/assets must be embedded), strip embedded scripts, remove any executable content
+3. **Rig detection** — "Standard humanoid rig detected" / "Non-humanoid rig" / "No rig (static mesh)"
+4. **Animation assessment** — "Generic animations will be retargeted" / "Custom animations detected for X/7 states, generics fill the rest" / "Non-humanoid: custom animations required"
+5. **Blend shape check** — "Facial blend shapes found — lip sync supported" / "No blend shapes — lip sync unavailable, speech uses body gestures only"
+6. **Polygon count and file size** — checked against hardware capability and a sensible storage cap (models sync via the sibling network)
+7. **Hardware impact assessment:**
+   - "This model uses ~X MB VRAM and ~X% GPU at idle"
+   - "Estimated performance impact: Low / Medium / High"
+   - Specific warnings: "Your GPU has 4GB VRAM — this model plus the LLM will leave limited headroom for other GPU-intensive applications"
+   - Block if below minimum: "Your hardware cannot render this model at an acceptable framerate. Recommended: default waveform or a simpler model"
+8. **Licence metadata (VRM)** — read usage permissions from the file and warn if redistribution isn't permitted
+9. **Legal acknowledgement** — one-time confirmation that the user has the right to use the model
+10. **Summary and confirm** — clear overview of what works, what's limited, and the trade-offs before committing
+
+The sanitised version is what gets stored and synced, not the original upload.
+
+### Hologram Colouring
+
+| Setting | Description |
+|---|---|
+| Primary colour tint (default) | Model rendered with a holographic tint in the assistant's primary colour. Reinforces identity, looks like a proper hologram. |
+| Full colour (optional) | Model rendered in its original colours. Looks more like a character, less like a hologram. |
+
+Configurable in the Appearance section of settings — same section that handles colours and waveform style.
+
+### Avatar in Identity
+
+The avatar model is part of the assistant's identity profile, synced via the sibling network alongside name, personality, and primary colour. No two siblings may have identical avatars — same model is permitted but they must differ (e.g. different primary colour tint). During setup, if the chosen model and colour combination matches another sibling on the network, the system flags it and asks the user to differentiate.
+
+### Display Behaviour
+
+**Default:** Hologram is off. Activates when a conversation starts (wake word or manual trigger). Deactivates after the conversation ends (silence timeout or explicit dismissal).
+
+**Always-on setting:** Toggle in settings. When enabled, the hologram stays up with idle animations between conversations.
+
+### Hologram Activation for Notifications
+
+The hologram can activate for notifications outside of conversations. Activation is governed by a combination of urgency, skill settings, and intelligent context analysis.
+
+#### Per-Skill Toggle
+
+Each skill has a "hologram alerts: always" toggle in its settings. When enabled, the hologram activates for that skill's notifications regardless of urgency. This is an override for situations where the user always wants visual notification for a specific skill.
+
+#### Intelligent Activation
+
+The assistant uses LLM context analysis to decide whether a notification warrants activating the hologram, independent of the per-skill toggle. The LLM considers:
+
+- Did the user initiate the action? (e.g. ordered food → delivery update is relevant)
+- Is the notification time-sensitive?
+- Is the user likely to want immediate awareness?
+
+This means the assistant can intelligently decide to activate the hologram for a food delivery update even without the user explicitly configuring it — because the user ordered the food and the update is time-sensitive and directly relevant.
+
+#### Critical Urgency
+
+Critical urgency always activates the hologram, regardless of per-skill settings, focus mode, or any other configuration. This is the emergency override.
+
+#### Focus Mode Interaction
+
+| Scenario | Hologram | Apology |
+|---|---|---|
+| Critical urgency | Activates | No — the situation is urgent, no time for pleasantries |
+| Scheduled/known event (meeting reminder, timer) | Activates if configured | No — the user set this up, they expect it |
+| Unexpected but worth interrupting (food delivery, intelligently escalated) | Activates | Yes — woven naturally into the message, not a canned prefix |
+| User corrects an interruption ("that didn't need to interrupt me") | N/A | Apologises for the misjudgement specifically, learns not to escalate that situation again |
+
+#### Apology Behaviour
+
+Apologies for focus mode interruptions are woven naturally into the delivery, not prefixed as a separate statement. The LLM generates varied, natural phrasing every time — never the same line twice in a row. The personality system shapes the tone (formal assistant vs casual assistant). Examples of the kind of natural delivery:
+
+- "Pardon the interruption sir, your food order is around the corner."
+- "Didn't want to leave this — your delivery driver's five minutes out."
+
+The assistant delivers the message, waits for acknowledgement, reacts (nod, gesture), then disappears. If the user follows up with a question, the assistant stays and continues the conversation.
+
+If the user corrects an interruption, the assistant apologises for the misjudgement and stores the correction as a learned preference — the LLM factors it in for future decisions.
+
+### Viewing Cone Mitigation
+
+Light field displays have a limited optimal viewing cone (53-60 degrees). The hologram addresses this through three progressive layers:
+
+#### Layer 1 — Strategic Placement (default)
+
+The hologram sits next to or below the user's monitor. 58 degrees is roughly the width of a person at a desk — natural desk positioning keeps the user within the cone with no extra hardware or configuration.
+
+#### Layer 2 — Head Tracking (software toggle)
+
+MediaPipe face tracking via a standard webcam. Runs locally (no data sent anywhere). Adjusts the render perspective in real-time based on the user's face position, optimising the 3D effect for their exact location within the viewing cone. Enabled via a toggle in settings.
+
+#### Layer 3 — Motorised Base (optional hardware upgrade)
+
+A stepper motor rotates the display to face the user. Uses the same ESP32 + serial-over-USB pattern as the Halo AI crystal. The base is designed from day one to accommodate both static and motorised use — the static version has a flat mounting plate with a cavity underneath sized for the motor, bearing, and slip ring (for power/data without cable tangling). Users who want the motorised upgrade add the components into the pre-designed cavity without reprinting or replacing the base.
+
+ESP32 firmware gains a motor control module. Voice-direction localisation or webcam-based position detection determines which direction to face.
+
+### Motorised Base Hardware
+
+| Part | Recommendation | Price |
+|---|---|---|
+| Stepper motor | 28BYJ-48 | ~£3-5 |
+| Motor driver | ULN2003 driver board | ~£1-2 |
+| Bearing | Lazy susan bearing (appropriate size for display) | ~£3-5 |
+| Slip ring | 6-wire capsule slip ring (for power + data through rotation) | ~£5-8 |
+| Microcontroller | ESP32-C3 SuperMini (same as Halo AI crystal) | ~£2-3 |
+
+**Per unit cost: ~£14-23** (excluding the holographic display and 3D printed base)
+
+### Wiring (Motorised Base)
+
+```
+USB 5V -------- ESP32 5V
+USB GND ------- ESP32 GND
+                ESP32 GPIO2 ------ Motor Driver IN1
+                ESP32 GPIO3 ------ Motor Driver IN2
+                ESP32 GPIO4 ------ Motor Driver IN3
+                ESP32 GPIO5 ------ Motor Driver IN4
+
+Display power/data routed through slip ring to allow continuous rotation.
+```
+
+### Relationship to USB Hardware
+
+The Halo AI crystal and the hologram coexist. The crystal is the assistant's portable home and storage. The hologram is a desk accessory that enhances the experience.
+
+The crystal gains one additional LED state:
+
+| State | Animation |
+|---|---|
+| Hologram active | Static glow in a distinct colour (differentiable from all other states) |
+| Hologram not connected / not in use | Normal LED behaviour as defined in Section 17 |
+
+### Standalone Mode (Multi-Device Edition)
+
+When used with the Multi-Device edition, the hologram can operate independently of the desktop — driven by the home server directly.
+
+#### Requirements
+
+- Home server must have a GPU capable of rendering the active avatar model
+- Built-in microphone for wake word detection and voice input
+- Built-in speaker for TTS output
+- Network connection to the home server
+
+#### Behaviour
+
+| Mode | When | Audio | Rendering | LLM/Skills |
+|---|---|---|---|---|
+| Desktop companion | Desktop app running, hologram plugged into same machine | Desktop mic/speakers | Desktop GPU | Local or server |
+| Standalone | Desktop off, hologram connected to home server via network | Built-in mic/speaker | Server GPU | Server |
+
+The system auto-switches to standalone mode when the desktop goes offline, and back to desktop companion mode when it reconnects. The handover is seamless.
+
+#### Setup Gating
+
+During setup, the wizard checks the home server's GPU and rendering capability. If the server meets requirements, standalone mode is available and configurable. If not, standalone mode is greyed out with a clear explanation of what hardware is missing and what would be needed. Standalone configuration is blocked entirely if the server cannot support it.
+
+### Sibling Interaction
+
+#### Current
+
+The hologram only displays the local assistant. Sibling conversations happen silently over the network — no hologram activation, no audio. Conversations are viewable via Telegram or the sibling web UI.
+
+#### Same-Room Interaction (Future)
+
+If two siblings with physical presence (e.g. hologram and droid, or two holograms) are in the same room, they could visually and audibly interact during conversations:
+
+- Both animate and speak from their own hardware
+- Spatial awareness via user-configured positions ("droid is to my left")
+- Motorised base rotates to face the other sibling during their conversation
+- Full audio from both devices, natural stereo from physical separation
+- Turn-taking with physical reactions (one speaks, the other listens and nods)
+
+This requires: room awareness (same local network + user configuration), spatial positioning, coordinated animation, and conversation turn-taking with physical expression. The building blocks exist (sibling network, motorised base, animation system) — only the coordination logic and spatial configuration need to be added.
+
+When siblings are in separate rooms, conversations always happen silently.
+
+### DIY Option: Pepper's Ghost
+
+A budget alternative using Pepper's Ghost projection — reflecting a bright screen off angled acrylic to create a floating image illusion.
+
+#### What's Included
+
+- 3D-printable enclosure design
+- Parts list and assembly instructions (same format as the Halo AI crystal section)
+- A Pepper's Ghost display adapter in the adapter layer (renders a single fixed viewpoint, flipped for the reflection)
+
+#### Parts
+
+| Part | Recommendation | Price |
+|---|---|---|
+| Acrylic sheet | Clear cast acrylic, 2-3mm thick, cut to size | ~£5-10 |
+| Frame | 3D printed enclosure | ~£2-5 PLA |
+| Screen | Spare monitor or tablet (user-supplied) | £0 (existing) |
+
+**Per unit cost: ~£7-15** (excluding the screen)
+
+#### Limitations vs Light Field Display
+
+| | Pepper's Ghost (DIY) | Light Field Display |
+|---|---|---|
+| Cost | ~£7-15 + spare screen | £150-3,000+ |
+| 3D depth | None (flat reflection) | Real parallax |
+| Viewing angle | Narrow, front-only | 53-58 degree cone |
+| Lighting needs | Dark room for best effect | Works in normal lighting |
+| Head tracking benefit | Minimal | Significant |
+| Motorised base benefit | Minimal | Significant |
+| Animation/models | Full support | Full support |
+
+Documented as a budget entry point with the recommendation that a proper light field display is the intended experience. Users can start with DIY and upgrade later — the adapter layer means the rest of the system doesn't change.
+
+### Settings
+
+The hologram adds the following to the settings UI:
+
+| Section | Setting | Description |
+|---|---|---|
+| Hologram | Display | Detected display model, adapter in use, connection status |
+| Hologram | Avatar | Current model, upload new model, preview |
+| Hologram | Colouring | Primary colour tint (default) / Full colour |
+| Hologram | Display behaviour | Off when not talking (default) / Always on |
+| Hologram | Head tracking | Off (default) / On (requires webcam) |
+| Hologram | Motorised base | Off / On (detected via ESP32 serial) |
+| Hologram | Standalone mode | Off / On (Multi-Device only, gated by server hardware) |
+| Hologram | Preview mode | Render to standard monitor window |
+| Skills (per skill) | Hologram alerts: always | Toggle — hologram always activates for this skill's notifications |
+
+### Addon Roadmap
+
+Separate from the core roadmap and edition roadmaps. Each phase is self-contained and shippable.
+
+| Phase | Content |
+|---|---|
+| H1 — Foundation | Stride integration, display adapter layer abstraction, single-view renderer (preview mode on standard monitor) |
+| H2 — Display Adapters | Looking Glass adapter, LeiaSR adapter, Sony XYN adapter, Pepper's Ghost adapter, display auto-detection |
+| H3 — Default Avatar | 3D KITT waveform, state animations (appear, idle, listening, thinking, speaking, acknowledge, disappear) |
+| H4 — Custom Models | Upload system, rig detection, validation pipeline, security sanitisation, generic animation retargeting, hardware gating, legal acknowledgement |
+| H5 — Lip Sync and Blend Shapes | Piper TTS phoneme/amplitude extraction, facial blend shape driver, fallback body gestures |
+| H6 — Head Tracking | MediaPipe integration, perspective adjustment, settings toggle |
+| H7 — Motorised Base | ESP32 firmware, stepper motor control, base design (static-compatible with motor cavity), slip ring wiring, parts list, assembly guide |
+| H8 — Standalone Mode | Home server rendering, built-in mic/speaker integration, auto-switch from desktop, server hardware gating in setup wizard |
+| H9 — DIY Pepper's Ghost | Enclosure design, single-view adapter, assembly guide, limitations documentation |
