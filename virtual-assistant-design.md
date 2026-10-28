@@ -35,6 +35,7 @@
 31. [Future: Car Assistant Edition](#31-future-car-assistant-edition)
 32. [Future: Droid Assistant Edition](#32-future-droid-assistant-edition)
 33. [Addon: Hologram Display](#33-addon-hologram-display)
+34. [Addon: Smart Glasses](#34-addon-smart-glasses)
 
 ---
 
@@ -69,9 +70,11 @@ User: "Order me a pepperoni pizza from Dominos"
 **Edition A — Desktop Only (self-contained):**
 
 - Everything runs on one machine
-- No server, no networking, no sync
 - All services bundled as standalone executables
 - Can run from USB (portable mode)
+- Optional: connect to a home server for LLM processing offload (toggle in settings, default off). When enabled, LLM inference is routed to the server if reachable, with automatic fallback to local processing if unavailable
+- Optional: participate in the sibling network (family server) when internet is available
+- Does not gain Multi-Device services (Telegram bot, SIP, mobile sync, multi-device clients)
 
 **Edition B — Multi-Device:**
 
@@ -181,6 +184,41 @@ Included in MVP (multi-device edition only).
 | Mobile (optional upgrade) | Qwen 2.5 1.5B Q4 | Better but ~1 GB |
 
 Users choose their model. A default ships with desktop/mobile, alternatives available on GitHub.
+
+### Cloud LLM Option (discouraged)
+
+For users who cannot run a local LLM due to technical or financial constraints — insufficient hardware and no access to a home server — the assistant supports routing LLM inference to a cloud-based model API as an alternative to local processing.
+
+**⚠ This option is strongly discouraged.** One of the core principles of this project is that it works without internet and keeps all data local. Using a cloud LLM **violates this principle.** The system prompt — including the assistant's personality, the user's relevant memories, conversation history, and preferences — is sent to a third-party API on every request. The user loses the privacy guarantees that the local-first design exists to provide. This option exists solely as a concession for users who want the assistant but genuinely cannot meet the hardware requirements by any other means.
+
+During setup, if the user selects cloud LLM, the installer presents a clear disclaimer:
+
+> **You are choosing to route your assistant's intelligence through a third-party cloud service. This means:**
+>
+> - Your conversations, including your assistant's personality and your personal memories, will be sent to an external server on every interaction
+> - You lose the privacy and data ownership guarantees that are a core principle of this project
+> - You will incur ongoing API costs billed by the cloud provider
+> - The assistant will not function without an internet connection — there is no offline fallback for LLM processing
+>
+> **This project is designed to run locally. Cloud LLM is a last resort, not a recommendation.**
+
+The user must explicitly acknowledge this before proceeding.
+
+**How it works:**
+
+The LLM interface in the .NET skill router is endpoint-agnostic. It sends messages and receives completions with tool calls. The change is the endpoint URL and authentication — nothing else in the stack (skills, memory, personality, voice, wake word) is affected.
+
+| Provider | Endpoint | Authentication | Notes |
+|---|---|---|---|
+| Local (Ollama) | `http://localhost:11434` | None | Default, recommended |
+| Home server (Ollama remote) | Server address via Cloudflare Tunnel | API key or mTLS | Requires Processing Server or Multi-Device Server |
+| Anthropic | `https://api.anthropic.com` | User's API key | Claude models. Function calling supported. |
+| OpenAI | `https://api.openai.com` | User's API key | GPT models. Function calling supported. |
+| OpenAI-compatible | Custom URL | User's API key | Covers any compatible endpoint (e.g. rented GPU running Ollama remotely) |
+
+The user provides their own API key. The project does not ship with, subsidise, or manage cloud API access. Configuration is in the Connections section of settings.
+
+**When cloud LLM is active**, a persistent indicator is shown in the settings panel and optionally on the desktop UI — a clear reminder that conversations are leaving the device.
 
 ---
 
@@ -653,10 +691,12 @@ Maximum messages per day is configurable. Creator can set a "chattiness" level.
 | Web search | SearXNG | Free | Yes (Docker) | Query Google + Bing, self-hosted metasearch |
 | Email | IMAP/SMTP | Free | N/A — direct protocol | Works with any email provider |
 | Calendar | CalDAV | Free | N/A — direct protocol | Works with any calendar provider |
-| Navigation (routing) | OSRM | Free | Yes | Offline routing, no traffic |
-| Navigation (traffic/ETA/places) | Mapbox | Free (100k req/mo) | No | Traffic-aware ETA, geocoding, place search |
+| Navigation (primary, online) | Google Maps Platform | Free (see below) | No — user adds API key | Navigation SDK, Places API, Routes API, Geocoding API. Primary online navigation provider. |
+| Navigation (offline fallback) | OSRM | Free | Yes | Offline routing with downloaded map data. No traffic, no re-routing, limited POI database. |
+| Navigation (geocoding fallback) | Mapbox | Free (100k req/mo) | No | Fallback geocoding and place search when Google Maps is unavailable |
 | Map display | Leaflet + OpenStreetMap | Free | Tiles from OSM | Interactive maps in UI |
 | Offline maps (mobile) | OpenMapTiles + GraphHopper | Free | Downloaded to device | ~4-7 GB per region (UK) |
+| Fuel prices | UK Government Fuel Finder | Free | No — GOV.UK One Login (OAuth 2.0) | REST API + CSV. Mandatory station reporting within 30 min of price changes. Prices, locations, brands, amenities, opening hours. |
 | Currency conversion | frankfurter.app (ECB) | Free, no key | No (no account needed) | Daily rates, 0.1-0.5% accuracy |
 | Translation (default) | LibreTranslate | Free | Yes (Docker) | Good for short/conversational text |
 | Translation (opt-in) | DeepL | Free (500k chars/mo) | No — user adds API key | Better for complex/long text |
@@ -667,6 +707,90 @@ Maximum messages per day is configurable. Creator can set a "chattiness" level.
 
 **Total running cost: ~1-2 GBP/mo** (just the SIP number). Everything else is free.
 
+### Navigation — Google Maps Platform
+
+Google Maps is the primary online navigation provider. Self-hosted alternatives (OSRM, Mapbox) are retained as offline fallbacks but have significant limitations: no real-time traffic, no automatic re-routing, and a smaller POI database. Google Maps provides the superior experience when online.
+
+**Google Maps free tiers (per-API monthly allowances, not pooled):**
+
+| API | Free/Month | Per 1,000 After Free | Used For |
+|---|---|---|---|
+| Navigation SDK | 1,000 destinations | £21 | Real-time turn-by-turn on mobile (headless mode). Handles re-routing, traffic, ETA — all on-device after initial route fetch. |
+| Places API (Nearby Search) | 10,000 | £4.20 | "Nearest petrol station", "nearest Aldi" — find places by type or name |
+| Routes API (Essentials) | 10,000 | £4.20 | Route calculation for desktop (no Navigation SDK on desktop) |
+| Routes API (Pro) | 5,000 | £8.40 | Traffic-aware routing for desktop |
+| Geocoding API | 10,000 | £4.20 | Address to coordinates and vice versa |
+
+A typical navigation request = 1 Places API call + 1 Navigation SDK destination. At 15 requests/day = ~450/month — well within all free tiers. Multi-destination routes (e.g. petrol station then holiday cottage) count as 1 Navigation SDK destination with waypoints.
+
+**How navigation works on mobile:**
+
+1. User requests navigation ("Take me to the cheapest diesel, then to the holiday cottage in Devon")
+2. The assistant's LLM classifies the intent and identifies destinations, travel mode, and any criteria (cheapest diesel)
+3. The assistant calls the relevant APIs — Places API for place search, Fuel Finder API for fuel prices if needed, Geocoding API for address resolution
+4. The assistant presents the options and confirms with the user
+5. On confirmation, the assistant launches the **Google Maps app on the phone** with the destination(s) and route pre-loaded via Android intent (`google.navigation:`) or iOS URL scheme (`comgooglemaps://`)
+6. Google Maps handles the full navigation UI, voice guidance, traffic, and re-routing on the phone
+7. Simultaneously, the **Navigation SDK runs in headless mode** in the assistant's mobile app, providing a real-time turn-by-turn data feed — manoeuvre type, road names, distance, ETA, lane guidance — all calculated on-device from the initial route fetch with no additional API calls during navigation
+8. The glasses HUD receives this data feed over BLE and displays arrows, street names, distance, and ETA
+9. If the phone is connected to the car via **Android Auto or CarPlay**, the assistant asks: "Shall I show navigation on your car's display or keep it on your phone?" If the user chooses the car, Google Maps projects to the car screen
+10. If the car supports direct satnav integration (e.g. Tesla Fleet API), the assistant offers to send the destination to the car's built-in navigation instead
+
+**Multi-destination routes:**
+
+The assistant supports multi-stop routes. When the user requests multiple destinations ("petrol station, then the holiday cottage"), the assistant:
+
+1. Resolves all destinations (place search, fuel prices, geocoding)
+2. Presents the full route: "I'll take you to the Shell on the A38 for diesel at 134.9p — that's 5 minutes away — then on to the cottage in Devon, about 2 hours 15 from there. Sound good?"
+3. On confirmation, launches Google Maps with the route including waypoints (intermediate stops) and the final destination
+4. The Navigation SDK tracks progress through each waypoint, updating the glasses HUD as each leg completes
+
+**How navigation works on desktop:**
+
+The desktop does not have the Google Maps app or the Navigation SDK. Instead:
+
+1. The assistant calls the **Routes API** to calculate the route
+2. The route is displayed on an interactive map (Leaflet + OpenStreetMap tiles) in the desktop UI
+3. If glasses are connected to the desktop, the route data is pushed to the glasses HUD for pre-departure review
+4. For actual turn-by-turn guidance, the assistant suggests transferring the route to the phone: "I've planned your route. Shall I send it to your phone for navigation?"
+5. The route is sent to the mobile app, which launches Google Maps and starts the Navigation SDK as described above
+
+**Car satnav integration (manufacturer-dependent):**
+
+Direct integration with car built-in navigation is available where manufacturer APIs permit. This is not a guaranteed feature — it depends on the car.
+
+| Manufacturer | Integration | Status |
+|---|---|---|
+| Tesla | Fleet API — `navigation_request` sends destinations directly to the car's nav | Fully supported |
+| Volvo (2026+ AAOS) | Google Maps "Send to Vehicle" via same Google account on phone and car | Best-effort — consumer feature, not a programmable API |
+| Other manufacturers | Added as APIs become available | Not supported at launch |
+
+Android Auto and CarPlay are the universal fallback — the phone's Google Maps navigation projects to the car screen regardless of manufacturer.
+
+**Offline navigation (OSRM fallback):**
+
+When the phone has no internet connection, the assistant falls back to OSRM with downloaded map data. Limitations are documented clearly to the user:
+
+- No real-time traffic data
+- No automatic re-routing if the user deviates
+- Limited POI database (cannot search for "nearest Aldi" — only works with coordinates or pre-cached locations)
+- No fuel price data (requires internet)
+- Route quality may be lower than Google Maps
+
+The assistant informs the user when falling back: "I'm offline, so I'll use downloaded maps. I won't have traffic data or re-routing."
+
+### Fuel Prices — UK Government Fuel Finder
+
+The Fuel Finder API provides real-time UK fuel prices as open data, mandated by the Motor Fuel Price (Open Data) Regulations 2025. Operated by VE3 Global, stations must report price changes within 30 minutes.
+
+**Data available:** Current retail prices by fuel type (petrol, diesel), station addresses, operators/brands, amenities, and opening hours.
+
+**Authentication:** OAuth 2.0 via GOV.UK One Login. Free access for developers and individuals.
+
+**Also available as:** CSV download (updated twice daily) and email subscription — useful as a backup if the API is unavailable.
+
+**How the assistant uses it:** When the user requests fuel-related navigation ("cheapest diesel nearby"), the assistant queries Fuel Finder for stations within a radius of the user's location, compares diesel prices, and presents the cheapest option(s) before starting navigation.
+
 ---
 
 ## 16. Edition Packaging
@@ -676,6 +800,7 @@ Maximum messages per day is configurable. Creator can set a "chattiness" level.
 - All services bundled as standalone executables (no Docker)
 - Can be installed to a machine or run portably from USB
 - Fully self-contained, no internet required for core functionality
+- Optional LLM offload: if a home server is available (Processing Server or Multi-Device Server), LLM inference can be routed there instead of running locally. Configured via a toggle in settings (default off). Falls back to local processing if the server is unreachable. This allows the assistant to run on lower-spec hardware by offloading the heaviest component.
 
 ### Multi-Device
 
@@ -683,6 +808,18 @@ Maximum messages per day is configurable. Creator can set a "chattiness" level.
 - Server services: Docker Compose (Ollama, SearXNG, LibreTranslate, OSRM, Asterisk, .NET API)
 - Mobile app: app store or sideload
 - The desktop client can run from a USB drive for portability — same USB hardware design as the desktop-only edition, but configured to connect to the home server instead of running its own LLM and services locally
+
+### Processing Server
+
+A lightweight server install for users who want LLM offload for Desktop Only assistants but do not need the full Multi-Device service stack. Installs only:
+
+- Ollama (LLM inference)
+- .NET API layer (accepts inference requests from Desktop Only clients)
+- Cloudflare Tunnel (so the server is reachable remotely)
+
+Does not install: Telegram bot, Asterisk/SIP, Sync API, SearXNG, LibreTranslate, OSRM, or any Multi-Device client management.
+
+If the user already has a Multi-Device Server installed, the processing capability is already included — no separate Processing Server install is needed. Desktop Only clients connect to the existing Ollama instance on the Multi-Device Server.
 
 ### USB Portable (Desktop Only or Multi-Device Client)
 
@@ -793,17 +930,23 @@ Standalone .NET TUI console app using **Spectre.Console**.
 
 1. Desktop Only (self-contained)
 2. Multi-Device Server
-3. Multi-Device Desktop Client
-4. Create Portable USB
+3. Processing Server (LLM offload only)
+4. Multi-Device Desktop Client
+5. Create Portable USB
 
 **Desktop Only install flow:**
 
 1. Select install location (or USB for portable)
 2. Detect hardware (CPU, GPU, RAM) — show findings, recommend model, allow override
-3. Download/copy model
-4. Install bundled services — user can deselect services they don't want, can install later
-5. Download map data — pre-select based on locale, allow more regions
-6. Launch first run wizard
+3. Select LLM source:
+   - **Local (recommended)** — download/copy model to device
+   - **Home server offload** — enter server address, test connection
+   - **Cloud provider (discouraged)** — select provider, enter API key, display privacy/cost disclaimer requiring explicit acknowledgement
+4. If local: download/copy model
+5. Install bundled services — user can deselect services they don't want, can install later
+6. Download map data — pre-select based on locale, allow more regions
+7. Optional: configure family server connection for sibling network (enter server address or skip)
+8. Launch first run wizard
 
 **Multi-Device Server install flow:**
 
@@ -816,6 +959,15 @@ Standalone .NET TUI console app using **Spectre.Console**.
 7. Start Docker stack
 8. Display client connection details
 9. Launch first run wizard
+
+**Processing Server install flow:**
+
+1. Check/install Docker
+2. Detect hardware, select LLM model
+3. Download model
+4. Configure Cloudflare Tunnel
+5. Start Docker stack (Ollama + .NET API only)
+6. Display connection details for Desktop Only clients
 
 **Multi-Device Client install flow:**
 
@@ -888,6 +1040,49 @@ Runs before the assistant launches every time:
 [!!] Telegram bot token not configured (optional)
 [ok] All checks passed - launching assistant...
 ```
+
+**Desktop Only with LLM offload enabled — additional pre-flight logic:**
+
+When LLM offload is enabled, the pre-flight checker tries the home server first. Local hardware is the fallback, not the other way around.
+
+```
+[ok] Configuration files found
+[..] LLM offload enabled — checking home server...
+[ok] Home server reachable (192.168.1.50 via Cloudflare Tunnel)
+[ok] Remote LLM model available (Qwen 2.5 7B Q4)
+[ok] Using remote LLM processing
+[ok] Whisper model loaded (local)
+[ok] Wake word model found (local)
+[ok] Voice profile enrolled
+[ok] TTS engine ready (local)
+[ok] Skills loaded (36/36)
+[ok] All checks passed - launching assistant...
+```
+
+If the home server is unreachable, fall back to local:
+
+```
+[ok] Configuration files found
+[..] LLM offload enabled — checking home server...
+[!!] Home server unreachable
+[..] Falling back to local hardware...
+[..] Detecting local hardware...
+[ok] Local hardware sufficient for configured model (Qwen 2.5 7B Q4)
+[ok] LLM model loaded (local)
+```
+
+If the home server is unreachable and local hardware is insufficient for the configured model:
+
+```
+[..] LLM offload enabled — checking home server...
+[!!] Home server unreachable
+[..] Falling back to local hardware...
+[!!] Local hardware insufficient for configured model (Qwen 2.5 7B Q4)
+[..] Checking for smaller local model...
+[ok] Falling back to local model (Qwen 2.5 3B Q4) — reduced capability
+```
+
+If no usable model is available locally or remotely, the pre-flight checker reports the failure and suggests either connecting to the home server or using a machine with better hardware.
 
 ### Update System
 
@@ -1029,7 +1224,7 @@ Overlay slides in from the side. Waveform stays visible — assistant is still a
 | Notifications | Urgency settings per skill, focus mode config, Telegram settings |
 | Privacy | Data sharing toggles, family server info, what's being sent |
 | Backup | Auto-backup settings, cloud storage config, manual export, restore (browse or drop files) |
-| Connections | Email account, calendar, Spotify, Mapbox, DeepL API key |
+| Connections | Email account, calendar, Spotify, Google Maps API key, Mapbox API key, DeepL API key, Fuel Finder (GOV.UK One Login), Cloud LLM provider and API key (if configured — shows active privacy warning) |
 | About | Version, creator info, licence, check for updates |
 
 ### Desktop — System Tray
@@ -2006,8 +2201,10 @@ The crystal gains one additional LED state:
 
 | State | Animation |
 |---|---|
-| Hologram active | Static glow in a distinct colour (differentiable from all other states) |
-| Hologram not connected / not in use | Normal LED behaviour as defined in Section 17 |
+| Companion device active | Static glow in a distinct colour (differentiable from all other states) |
+| No companion device connected | Normal LED behaviour as defined in Section 17 |
+
+This LED state is shared across all companion device addons (hologram, smart glasses, and any future addons). When any addon takes ownership of visual output or notification delivery, the crystal shows the same "companion device active" indicator — it is not per-device.
 
 ### Standalone Mode (Multi-Device Edition)
 
@@ -2118,3 +2315,483 @@ Separate from the core roadmap and edition roadmaps. Each phase is self-containe
 | H7 — Motorised Base | ESP32 firmware, stepper motor control, base design (static-compatible with motor cavity), slip ring wiring, parts list, assembly guide |
 | H8 — Standalone Mode | Home server rendering, built-in mic/speaker integration, auto-switch from desktop, server hardware gating in setup wizard |
 | H9 — DIY Pepper's Ghost | Enclosure design, single-view adapter, assembly guide, limitations documentation |
+
+---
+
+## 34. Addon: Smart Glasses
+
+Post-release addon that adds smart glasses as an additional interface for the assistant. The glasses provide a heads-up display (HUD) for notifications, navigation, and short text responses, plus microphone input for voice commands — all visible only to the wearer. This is an optional accessory, not a separate edition. It integrates into the existing Desktop Only and Multi-Device editions as an optional module within both the mobile and desktop apps.
+
+**No camera.** The glasses are deliberately camera-free to avoid legal and privacy concerns. They are a display and audio input device only.
+
+**Hardware landscape note:** The design decisions in this section are based on the smart glasses market as of October 2026. The smart glasses market is evolving rapidly (Even Realities discontinued the G1 after roughly one year). The hardware landscape will be re-evaluated before development begins, and the specific device support, display capabilities, and BLE protocol details may change to reflect the technology available at that time.
+
+### Hardware Landscape (October 2026)
+
+The system is **display-agnostic**. It supports any compatible smart glasses through a BLE adapter layer, not locked to a single manufacturer. The launch adapter targets the Even Realities G2 — the strongest combination of no camera, mature BLE protocol, developer ecosystem, and normal-glasses appearance. Additional adapters are added on request.
+
+| Device | Display | Camera | SDK Maturity | Price | Weight | Battery |
+|---|---|---|---|---|---|---|
+| Even Realities G2 | Dual micro-LED, green mono, 640x350, 27.5° FoV, 1200 nits, 60Hz | No | Mature — BLE protocol fully documented by community | ~£500 | 36g | 2+ days |
+| Vuzix Z100 | 640x480, green mono, 30° FoV | No | Mature — Android/iOS native SDK | ~£420 | 38g | 48 hrs |
+| MemoMind One | Dual micro-LED, green mono, 640x350, 2000 nits | No | Early — BLE protocol + SDK opened Sep 2026 | ~£330 | 47g | 16 hrs |
+| RayNeo iO | Dual micro-LED, green mono, 23.5° FoV, 1300 nits | No | Poor — no public SDK | ~£370-420 | 33g | 2 days |
+
+All camera-free HUD glasses use green monochrome displays. They are designed for glanceable text-based information — short text, icons, navigation arrows, and status indicators. Not rich media, images, or colour.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  VirtualAssistant Mobile App / Desktop App                   │
+│                                                              │
+│  ┌─────────────┐    ┌─────────────────────────────────────┐  │
+│  │ State        │───▶│ Glasses Module                      │  │
+│  │ Machine      │    │                                     │  │
+│  │ (idle,       │    │  ┌───────────────────────────────┐  │  │
+│  │  listening,  │    │  │ Content Renderer              │  │  │
+│  │  thinking,   │    │  │ - HUD layout engine           │  │  │
+│  │  speaking)   │    │  │ - Notification formatter      │  │  │
+│  └─────────────┘    │  │ - Navigation display builder   │  │  │
+│                      │  └──────────────┬────────────────┘  │  │
+│  ┌─────────────┐    │                 │                    │  │
+│  │ Skill Router │───▶│  ┌──────────────▼────────────────┐  │  │
+│  │ (navigation, │    │  │ Glasses Adapter Layer          │  │  │
+│  │  weather,    │    │  │ ┌───────────┐ ┌────────────┐  │  │  │
+│  │  calendar)   │    │  │ │ Even G2   │ │ Future     │  │  │  │
+│  └─────────────┘    │  │ │ Adapter   │ │ Adapter    │  │  │  │
+│                      │  │ │ (BLE)     │ │ (BLE)      │  │  │  │
+│  ┌─────────────┐    │  │ └───────────┘ └────────────┘  │  │  │
+│  │ openWakeWord │◀───│  │                               │  │  │
+│  │ (wake word   │    │  └───────────────────────────────┘  │  │
+│  │  detection)  │    └─────────────────────────────────────┘  │
+│  └─────────────┘                                              │
+│                                                              │
+│  ┌─────────────┐    ┌──────────────────┐                     │
+│  │ Piper TTS   │───▶│ Audio Output      │                     │
+│  │ (audio)     │    │ (earbuds / phone) │                     │
+│  └─────────────┘    └──────────────────┘                     │
+└──────────────────────────────────────────────────────────────┘
+          │                         │
+    ┌─────▼──────┐           ┌──────▼──────┐
+    │ Glasses    │           │ R1 Ring     │
+    │ (BLE)     │           │ (BLE,       │
+    │            │           │  optional)  │
+    └────────────┘           └─────────────┘
+```
+
+The glasses connect to the mobile or desktop app via Bluetooth Low Energy (BLE). The app handles all intelligence — wake word detection, LLM processing, skill execution — and pushes display content to the glasses through the adapter layer. Audio output routes through the phone's current audio device (earbuds, phone speaker, or connected speaker).
+
+### BLE Communication
+
+The glasses communicate using standard BLE 5.x with GATT services. No proprietary pairing gate or certificate checking exists on the Even G2 — any BLE client can connect. The Even Realities companion app is **not required** for day-to-day use. The community has fully documented the BLE protocol including the authentication handshake, CRC-16/CCITT framing, dual-channel design (content and rendering characteristics), and protobuf payloads.
+
+**The official Even Realities companion app is kept installed solely for firmware updates and initial device setup (waking the glasses from shipping mode).** Day-to-day, the assistant's mobile or desktop app owns the BLE connection exclusively.
+
+The glasses only hold one BLE connection at a time. Whichever app currently holds the connection has exclusive control.
+
+**BLE libraries:**
+
+| Platform | Library |
+|---|---|
+| Mobile (MAUI) | Plugin.BLE |
+| Windows desktop | Windows.Devices.Bluetooth |
+| Mac desktop | CoreBluetooth (via .NET binding) |
+| Linux desktop | BlueZ (via .NET binding) |
+
+### Display Adapter Layer
+
+The adapter layer abstracts glasses communication behind a common interface (`IGlassesAdapter`). Each adapter handles the specifics of a particular device's BLE protocol — service discovery, authentication, content formatting, and display commands.
+
+The first and only launch adapter targets the Even Realities G2. Additional adapters (e.g. Vuzix Z100) are added on request when users raise the need.
+
+The adapter exposes capabilities so the system can query what a particular device supports:
+
+- Display resolution and format
+- Microphone availability
+- Touch input availability
+- Head gesture support
+- Companion ring support
+- Speaker availability (none on Even G2)
+
+Features that depend on unsupported capabilities degrade gracefully — if a future adapter targets glasses with built-in speakers, audio responses can route through them. If speakers are absent (Even G2), audio routes through the phone/earbuds.
+
+### HUD Content Tiers
+
+The display is optimised for glanceable information. Content is organised into five tiers based on how naturally it fits the green monochrome, 640x350 HUD.
+
+#### Tier 1 — Always Present (when HUD is active)
+
+- Time and date
+- Compact status symbols: glasses battery, Bluetooth connection, music playing indicator
+
+Status symbols are rendered as small icons at the edge of the display, taking minimal vertical space. They are shown constantly whenever the HUD is active, not just on the dashboard.
+
+#### Tier 2 — Push Notifications (appear briefly, dismiss on gesture or timeout)
+
+- Message previews (sender + first line)
+- Incoming call display
+- Timer and reminder alerts
+- Calendar event reminders (configurable lead time)
+- Weather alerts
+- System alerts ("server offline", "glasses battery low")
+- Skill notifications following the existing urgency system (Section 12)
+
+#### Tier 3 — Active Use (temporary overlay, replaces dashboard while in use)
+
+- Navigation turn-by-turn arrows, street names, and distance
+- AI assistant short text responses (1-3 lines)
+- Real-time translation overlay
+- Music — now playing info on track change (3-5 seconds, then dismisses back to dashboard). A small music note status icon persists in the tier 1 symbols while music is playing. Tap or voice command to show now playing again on demand.
+
+#### Tier 4 — Hybrid Delivery (text on HUD + audio through earbuds/phone)
+
+- Longer AI responses — summary on HUD, full response spoken
+- Email previews — sender and subject on HUD, body read aloud if requested
+- Message previews — preview on HUD, full message spoken
+
+The assistant selects the delivery method based on response length and context. Short confirmations and alerts are text-only on the HUD. Longer responses use the hybrid approach.
+
+#### Tier 5 — Not Displayed on Glasses (other clients only)
+
+- Full email bodies
+- Complex formatted content
+- Anything requiring images or colour
+- Long-form text (web search results, document reading)
+
+### Navigation
+
+The glasses receive turn-by-turn navigation data from the Google Maps Navigation SDK running in headless mode on the phone (see Section 15 for the full navigation architecture). The Even Realities proprietary mapping is not used.
+
+On mobile, the Navigation SDK provides a real-time data feed — manoeuvre type, road names, distance, ETA, lane guidance — all calculated on-device after the initial route fetch with no additional API calls during navigation. The glasses adapter pushes this data to the HUD: a directional arrow, street name, distance to the next turn, and remaining ETA. Multi-destination routes update the HUD as each waypoint is reached.
+
+When offline, the assistant falls back to OSRM with downloaded map data and pushes basic turn-by-turn instructions to the glasses (no real-time re-routing or traffic).
+
+Navigation supports walking, cycling, and driving modes. The driving safety lockout (see below) applies — if the user is detected as driving, visual navigation pauses and falls back to audio-only directions through earbuds/phone. Passengers see navigation on the HUD.
+
+### Audio Delivery
+
+The Even G2 has microphones but no speakers. Audio output routes through the phone's current audio device:
+
+- **Earbuds paired to phone** — TTS and audio responses play through earbuds (recommended for full experience)
+- **Phone speaker** — TTS plays from the phone if no earbuds are connected
+- **Desktop speakers** — if glasses are paired to the desktop
+
+The assistant uses a hybrid delivery model. Short responses (confirmations, alerts, single-line answers) are displayed as text on the HUD with no audio. Longer responses (AI answers, message readouts, email bodies) are summarised on the HUD and spoken in full through the audio output.
+
+If a future glasses adapter targets a device with built-in speakers, the adapter's capability declaration allows audio to route through the glasses directly.
+
+### Input Methods
+
+#### Voice (primary)
+
+Voice is the primary input method. The glasses' microphones stream audio over BLE to the connected device (phone or desktop), where openWakeWord processes it for wake word detection. Once the wake word is recognised, the audio stream is captured for the voice command and routed through the assistant's normal STT pipeline (Whisper).
+
+Wake word detection runs via the glasses mic — the phone may not be nearby (in a bag, across the room). The glasses are the microphone source; the connected device is the processing engine.
+
+Active, passive, and silent listening modes work the same as on the desktop (Section 9):
+
+| Mode | Behaviour |
+|---|---|
+| Passive | Glasses mic listens for wake word only. No transcription, no storage. |
+| Active | Glasses mic listens and the assistant responds to everything. |
+| Silent | Microphones disabled. No audio processing. Activated via touch gesture or voice command. |
+
+#### Touch Strips
+
+The Even G2 has capacitive touch strips on both temples supporting single tap, double tap, long press, and knock gestures. Each gesture is mapped to a configurable action:
+
+| Gesture | Default Action |
+|---|---|
+| Single tap | Dismiss notification / select |
+| Double tap | Go back / cancel |
+| Long press | Activate assistant (alternative to wake word) |
+| Knock | Cycle through active content |
+
+Gesture-to-action mapping is configurable in the settings panel.
+
+#### Head Gestures
+
+The G2's IMU supports head gesture recognition:
+
+| Gesture | Default Action |
+|---|---|
+| Head up | Wake HUD / show dashboard |
+| Nod | Confirm / yes / dismiss |
+| Shake | Decline / no / cancel |
+
+Nod and shake enable hands-free confirmation when voice is not appropriate (meetings, quiet environments). Sensitivity is configurable in settings to reduce false positives from natural head movement.
+
+#### R1 Companion Ring (optional)
+
+The Even R1 ring connects via BLE and acts as a controller:
+
+| Gesture | Action |
+|---|---|
+| Single tap | Confirm / select |
+| Double tap | Go back / dismiss |
+| Swipe (hold + slide) | Scroll through content |
+
+The ring is fully supported out of the box but nothing requires it — every ring action has a voice, touch, or head gesture equivalent.
+
+Ring battery level and charging state are displayed alongside the glasses in the settings panel and covered by the same proactive low-battery alerts.
+
+### Display Behaviour
+
+**Default: wake to show.** The HUD is dark when not in use. It activates on user interaction (head-up gesture, tap, voice command, wake word, or ring input) and returns to dark after a configurable timeout (default 10 seconds) once the interaction completes.
+
+**Always-on option:** A toggle in settings. When enabled, the tier 1 dashboard (time, date, status symbols) is shown constantly while the glasses are worn. Notifications and active content overlay on top.
+
+**Tied to assistant active state:** Active features (navigation, translation, conversation) keep the HUD alive for their duration. When the feature ends (conversation finishes, navigation arrives, translation stops), the HUD remains for the configured timeout period and then goes dark.
+
+**Wear detection:** The HUD does not activate automatically when the glasses are put on. Wear detection's role is notification routing (are the glasses being worn?) and power saving (don't process BLE display commands if the glasses are on a desk), not triggering the display.
+
+### Authentication and Guest Access
+
+The glasses use speaker recognition to determine who is wearing them. Three states govern access:
+
+| State | Trigger | What's Available |
+|---|---|---|
+| **Locked** | Glasses put on, no voice recognised yet | HUD dark until user engages. On engagement: nothing (guest toggle off) or guest HUD (guest toggle on). |
+| **Unlocked** | Primary user voiceprint confirmed | Full experience — all tiers, notifications, personal data. |
+| **Guest** | Unrecognised voice, guest toggle on | Time, date, weather, general Q&A only. No personal data, no notifications, no messages, no calendar. |
+
+**Unlock flow:**
+
+1. Glasses are put on — wear detection fires, HUD stays dark
+2. User engages (gesture, tap, voice, ring)
+3. If no voice yet — guest HUD only (if guest toggle is on) or nothing (if guest toggle is off)
+4. User speaks — speaker recognition runs against known voiceprints
+5. Primary user confirmed — glasses unlock to full access
+6. Glasses remain unlocked until wear detection drops (glasses removed)
+7. Glasses put back on — cycle resets to locked
+
+Guest access is controlled by a toggle in settings (default off). When off, unrecognised wearers get no HUD content at all. When on, they get the limited guest experience — same concept as the "unknown" tier in the identity hierarchy (Section 10).
+
+### Driving Safety
+
+The glasses include a visual lockout when the wearer is detected as driving. Audio responses continue through earbuds or the phone — only the HUD display is affected.
+
+**Detection:** The phone's GPS detects sustained speed above a configurable threshold (default 15 mph / 24 km/h) for 10+ seconds. The HUD suspends, showing a brief "Driving detected — HUD paused" message before going dark.
+
+**Passenger override:** The user can say "I'm a passenger" or tap a toggle in the app to re-enable the HUD. The override persists until speed drops to zero for 2+ minutes (journey ended), then resets automatically.
+
+**Audio continues:** Voice interaction works normally during the lockout. The assistant can still hear commands via the glasses mic and respond via earbuds/phone speaker. Only the visual display is suspended.
+
+**Configurable:** The speed threshold and detection duration are adjustable in settings. The lockout can be disabled entirely (at the user's own risk).
+
+**Liability:** The documentation includes a safety disclaimer that the driving lockout is a safety feature, not a guarantee, and the user is responsible for safe driving. This mirrors Even Realities' own policy of not supporting driving navigation for safety reasons.
+
+### Notification Delivery
+
+When the glasses are worn (wear detection active) and unlocked (primary user confirmed), they become the **primary notification channel**, replacing the phone screen or desktop UI notification for present states.
+
+| Urgency | HUD Behaviour | Audio Behaviour |
+|---|---|---|
+| Low | HUD notification (text, auto-dismiss after configured duration) | Silent |
+| Medium | HUD notification (text, persists until dismissed) | Optional chime through earbuds/phone |
+| High | HUD notification + wakes display if dark | Spoken through earbuds/phone |
+| Critical | HUD notification + wakes display + persists | Spoken immediately through earbuds/phone |
+
+**When glasses are not worn** (wear detection inactive, glasses in case, BLE disconnected, or locked/guest state), the existing notification escalation paths from Section 12 apply as if the glasses do not exist. Notifications are not pushed to glasses sitting on a desk.
+
+**Focus mode:** Low urgency is queued. Medium shows on HUD only (no audio). High wakes display with audio. Critical overrides everything.
+
+### Companion Ring — Health Data
+
+The R1 ring tracks heart rate, HRV, SpO2, body temperature, steps, calories, and sleep. At launch, the ring is supported as an **input device and for battery/connection monitoring only**. Health data reading and integration is a possible future enhancement, not a launch commitment.
+
+**Launch scope:**
+
+- Ring battery level, charging state, and connection status in the settings panel
+- Ring input gestures (tap, double tap, swipe)
+- Proactive low-battery alerts (same as glasses)
+
+**Possible future enhancement (if added):**
+
+- Read and display raw health metrics on request ("What's my heart rate?")
+- Store health data locally for the user's reference
+- User-configured threshold alerts ("Tell me if my heart rate goes above 120")
+- Sleep data as context for assistant tone adjustment (shorter briefings after poor sleep)
+- Step count and activity available as skill data
+
+If health features are added, the documentation will include a disclaimer that the assistant is not a medical device and health data is for informational purposes only.
+
+### Offline Behaviour
+
+The glasses inherit the offline behaviour of whichever device they are connected to. They add no new offline complexity — they are a display layer on top of the connected device's capabilities.
+
+| Scenario | Experience |
+|---|---|
+| Glasses connected, phone has internet | Full experience. All tiers, all features. |
+| Glasses connected, phone has no internet | Tier 1 dashboard works (time from phone clock). Calendar events already synced are available. Navigation works with downloaded OSRM map data. Reminders and timers work. AI limited to on-device model. Translation limited to local LibreTranslate if running. Online skills offer to queue (existing behaviour from Section 8). |
+| Glasses lose BLE connection | Glasses go dark. Assistant continues on phone/desktop as normal. On BLE reconnect, glasses pick up current state — no replay of missed notifications. |
+| Desktop edition, no internet | Same as phone scenario but with the desktop's larger offline model and locally running OSRM. |
+
+### Privacy
+
+**No camera** removes the primary privacy concern associated with smart glasses.
+
+**Microphone:** The glasses have four microphones that stream audio to the connected device for wake word detection and voice commands. In passive mode, audio is processed locally for wake word detection only — no transcription, no storage, nothing sent to the server. The mic can be fully disabled via silent mode (touch gesture or voice command).
+
+**Display visibility:** Waveguide displays are only visible to the wearer. Someone standing next to the user cannot see what is on the HUD.
+
+**No ambient audio storage:** The assistant never stores ambient audio. Only wake word detection audio and active command audio are processed. If translation or transcription features are active, they have clear on/off states and do not persist raw audio after the session ends.
+
+**Social acceptability:** No camera means the glasses look like normal glasses — no social stigma, no visible recording light needed. The only external tell is a faint green glow on the lens when the HUD is active, which is barely visible to others.
+
+### Relationship to Existing Clients
+
+The glasses are an **addon module** — the same pattern as the hologram. They are not a standalone client or a separate edition. The glasses adapter is built into both the mobile app and the desktop app as an optional module.
+
+The glasses function as a **roaming display layer** that follows the user across contexts:
+
+| Context | Glasses Paired To | Experience |
+|---|---|---|
+| At home, at desk | Desktop (BLE) | Full experience alongside the hologram (if present) |
+| Out and about | Phone (BLE) | Full experience alongside Telegram |
+| In the car (passenger) | Phone (BLE) | Full experience, visual navigation on HUD |
+| In the car (driver) | Phone (BLE) | Audio only, HUD locked out |
+
+**Handover:** The glasses connect to whichever paired device is in BLE range. If both the phone and desktop are in range, the user configures a priority device in settings (default: phone). When the priority device is out of range, the glasses connect to the other. When the priority device returns to range, the glasses switch back. Content continuity is seamless — the glasses pick up the current state of whichever assistant they connect to.
+
+**Relationship to hologram:** When the glasses are connected to the same assistant as the hologram (both on the desktop), the hologram takes priority for visual output. Notifications may still appear on the glasses HUD, but the hologram is the richer visual experience at the desk. When the glasses are connected to a different assistant (e.g. glasses on phone connected to a different assistant than the desktop), neither takes priority — they are independent.
+
+### Assistant Routing (Multi-Device Only)
+
+By default, the glasses talk to whichever assistant the mobile or desktop app is connected to. However, the mobile app supports **routing glasses traffic to a different assistant** on the home network. This allows a user to interact with one assistant through the phone and a completely different assistant through the glasses — simultaneously.
+
+**Why this matters:** A user might want a dedicated glasses-only assistant with a different personality, or might want their glasses to connect to a sibling assistant running on a different machine while their phone stays connected to their primary assistant.
+
+#### How It Works
+
+The mobile app maintains two independent connections when assistant routing is configured:
+
+1. **Phone connection** — the app's own connection to its primary assistant (used for phone screen interaction, Telegram, voice through phone mic/speaker)
+2. **Glasses connection** — a separate network connection to a different assistant's server, carrying all glasses BLE traffic (mic audio, HUD content, notifications, input gestures)
+
+Both connections are fully independent. The phone assistant and the glasses assistant are unaware of each other (unless they are siblings on the family server, in which case they have the normal sibling relationship).
+
+#### Assistant Discovery
+
+The mobile app discovers available assistants through two sources:
+
+| Source | What It Provides |
+|---|---|
+| Family server (if configured) | Sibling roster — all assistants created by the same creator, with names, personalities, and server addresses |
+| Hunter Industries API (if registered) | Assistant registry — all registered assistants, with names and connection details |
+
+The glasses routing setting shows a list of available assistants from these sources. The user selects which one the glasses should route to.
+
+#### Configuration
+
+The glasses routing setting is in the glasses section of the mobile app settings:
+
+| Setting | Options |
+|---|---|
+| Glasses assistant | Same as phone (default) / [list of available assistants on the network] |
+
+When set to "Same as phone," the glasses work exactly as described in the rest of this section — they are a display layer for the phone's assistant. When set to a specific assistant, the mobile app opens a separate network connection to that assistant's server and routes all glasses BLE traffic through it.
+
+#### Desktop Limitation
+
+The desktop app does **not** support assistant routing. A desktop install is tied to a specific assistant — the personality files, model, configuration, and data are all local to that install. To connect a different assistant to the desktop, a separate install is required. Glasses connected to the desktop always talk to that desktop's assistant.
+
+#### Requirements
+
+- Multi-Device edition only (requires network access to other assistants' servers)
+- The target assistant must be running and reachable on the network
+- The target assistant's server must be configured to accept connections from the mobile app (API key or mutual TLS, as defined in Section 25)
+- Family server or Hunter Industries API must be configured for assistant discovery
+
+#### Offline Behaviour
+
+If the target assistant's server is unreachable (offline, network issue), the glasses fall back to the phone's own assistant until the target server comes back. A brief HUD notification informs the user: "[Assistant name] is unreachable — using [phone assistant name]." When the target server comes back online, the glasses switch back automatically.
+
+### Edition Compatibility
+
+| Edition | Glasses Support | Notes |
+|---|---|---|
+| Desktop Only (Edition A) | Yes | Glasses pair to desktop Bluetooth. Works within BLE range (~10m). |
+| Multi-Device (Edition B) | Yes | Glasses pair to phone (primary) and/or desktop. Full experience at home and on the go. Handover between devices. |
+| Car edition | No direct support | The car edition has no glasses adapter. A passenger's glasses are handled by their phone. |
+| Droid edition | No interaction | The droid is its own thing. |
+
+### Relationship to USB Hardware
+
+The Halo AI crystal's LED state system (Section 17) uses the shared "companion device active" indicator defined in Section 33. When the glasses are connected to the same assistant stored on the USB, the crystal shows the companion device active LED state — the same indicator used for the hologram or any future addon that takes ownership of visual output or notification delivery.
+
+### Device Management
+
+The Even Realities companion app is kept installed but is only used for:
+
+- **Initial setup:** Waking the glasses from shipping mode (one-time)
+- **Firmware updates:** OTA updates to the glasses and R1 ring firmware (a few times per year)
+
+For firmware updates, the user disconnects the assistant's app, opens the Even Realities app, performs the update, then reconnects. This is a minor inconvenience that occurs infrequently.
+
+**All other device management is handled by the assistant's mobile or desktop app:**
+
+- Battery levels (glasses left arm, right arm, case, R1 ring)
+- Charging state
+- Connection status and signal strength
+- Firmware version (display only)
+- Display settings (brightness, distance, height, auto-brightness)
+- Gesture configuration
+- Wear detection toggle
+- Silent mode
+- All settings listed in the settings table below
+
+### Legal Considerations
+
+- Same overarching licence as the main project (proprietary source-available, Section 13)
+- No trademarked names in the product — the addon is not branded with any manufacturer's name
+- The Even Realities name and G2 branding are referenced in documentation as supported hardware only, not in the product name
+- BLE protocol usage is clean — Even Realities ships an open-source BSD-2-Clause demo app and the community has documented the protocol under open-source licences (Apache 2.0 for MentraOS). No reverse engineering of proprietary software.
+- **Driving safety disclaimer:** The documentation includes a liability notice that the driving lockout is a safety feature, not a guarantee, and the user is responsible for safe driving
+- **No camera means no image capture privacy concerns** — the primary legal concern associated with smart glasses (recording others without consent) does not apply
+
+### Settings
+
+The glasses addon adds the following to the settings UI in both the mobile and desktop apps:
+
+| Section | Setting | Description |
+|---|---|---|
+| Glasses | Device info | Glasses serial number, firmware version, R1 ring info if paired |
+| Glasses | Battery detail | Left arm, right arm, case, ring — percentage, charging state |
+| Glasses | Connection | Status, signal strength, connected device (phone/desktop), priority toggle |
+| Glasses | Display brightness | Manual level + auto-brightness toggle |
+| Glasses | Display distance | Near / Mid / Far |
+| Glasses | Display height | Vertical position slider |
+| Glasses | Head-up angle | 0-60° slider + calibrate button |
+| Glasses | Display timeout | 3s / 5s / 10s / 15s |
+| Glasses | Display mode | Wake to show (default) / Always on |
+| Glasses | Wear detection | On / Off |
+| Glasses | Silent mode | On / Off |
+| Glasses | Guest usage | Allow guests to use glasses (default off) |
+| Glasses | Driving safety | Speed threshold, auto-lockout on/off |
+| Glasses | Glasses assistant | Same as phone (default) / list of available assistants on the network (Multi-Device mobile app only) |
+| Glasses | Gestures — touch | Single tap, double tap, long press, knock — action assignment |
+| Glasses | Gestures — head | Nod, shake — action assignment, sensitivity slider |
+| Glasses | Ring input | Tap, double tap, swipe — action assignment (visible only when ring paired) |
+| Voice | Glasses mic | Wake word via glasses mic on/off, mic source priority |
+| Notifications | Glasses as primary | Use glasses for notifications when worn (default on) |
+
+### Addon Roadmap
+
+Separate from the core roadmap, edition roadmaps, and hologram addon roadmap. Each phase is self-contained and shippable.
+
+| Phase | Content |
+|---|---|
+| G1 — BLE Foundation | IGlassesAdapter abstraction, Even G2 BLE adapter implementation (Plugin.BLE for mobile, Windows.Devices.Bluetooth for desktop), device discovery, pairing, connection management, wear detection, battery/charging/connection status reading, R1 ring connection and battery status |
+| G2 — Settings Panel | Glasses section in mobile and desktop settings UI — device info, battery detail (glasses left/right/case, ring), display brightness, display distance/height, head-up angle, auto display timeout, wear detection toggle, gesture configuration, silent mode, connection priority (phone vs desktop) |
+| G3 — HUD Display | Tier 1 persistent status symbols (time, date, battery, Bluetooth, music indicator), wake-to-show default with always-on option, display timeout logic tied to assistant active state, compact status symbol rendering |
+| G4 — Notifications | Tier 2 push notifications over BLE, urgency-based display behaviour (auto-dismiss/persist/wake display), wear detection gating (only push when worn), integration with existing notification escalation system |
+| G5 — Voice Input | Glasses mic audio streaming over BLE, wake word detection on connected device (openWakeWord), voice command capture (Whisper STT), active/passive/silent listening modes |
+| G6 — Navigation | Google Maps Navigation SDK integration (headless mode, native binding libraries for MAUI), real-time turn-by-turn data feed push to HUD (directional arrows, street names, distance, ETA), multi-destination waypoint support, Google Maps app launch with route on phone, Android Auto/CarPlay detection and car display prompt, OSRM offline fallback, walking/cycling/driving modes |
+| G7 — Input Methods | Touch strip gesture handling (single tap, double tap, long press, knock), head gesture recognition (nod, shake, head-up) with configurable sensitivity, R1 ring input (tap, double tap, swipe scroll), configurable gesture-to-action mapping |
+| G8 — Active Features | Tier 3 content — AI assistant short text responses on HUD, real-time translation overlay (LibreTranslate/DeepL), music now playing on track change with persistent status icon |
+| G9 — Hybrid Delivery | Tier 4 content — audio routing for longer responses through earbuds/phone, summary on HUD with full response spoken, email/message preview + spoken readout |
+| G10 — Driving Safety | Speed-based GPS auto-lockout (visual only — audio continues), manual "I'm a passenger" override (voice + app toggle), auto-reset on journey end (speed zero for 2+ minutes), configurable speed threshold and detection duration |
+| G11 — Handover | BLE connection handover between mobile and desktop apps, priority device configuration, seamless content continuity on device switch, automatic fallback when priority device is out of range |
+| G12 — Assistant Routing | Assistant discovery via family server/Hunter Industries API, glasses routing setting in mobile app, dual connection management (phone assistant + glasses assistant simultaneously), fallback to phone assistant when target is unreachable, automatic reconnect |
