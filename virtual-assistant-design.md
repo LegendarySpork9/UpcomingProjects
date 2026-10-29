@@ -20,22 +20,23 @@
 16. [Edition Packaging](#16-edition-packaging)
 17. [USB Hardware Design](#17-usb-hardware-design)
 18. [Install and Update Wizards](#18-install-and-update-wizards)
-19. [Home Server Minimum Specs](#19-home-server-minimum-specs)
-20. [UI Design](#20-ui-design)
-21. [Error Handling and Resilience](#21-error-handling-and-resilience)
-22. [Logging and Diagnostics](#22-logging-and-diagnostics)
-23. [Rate Limiting and Resource Management](#23-rate-limiting-and-resource-management)
-24. [Privacy and Data Transparency](#24-privacy-and-data-transparency)
-25. [Security](#25-security)
-26. [Data Export and Backup](#26-data-export-and-backup)
-27. [Versioning Strategy](#27-versioning-strategy)
-28. [Dev/QA Environments](#28-devqa-environments)
-29. [Code Standards and Project Structure](#29-code-standards-and-project-structure)
-30. [Build Order / Roadmap](#30-build-order--roadmap)
-31. [Future: Car Assistant Edition](#31-future-car-assistant-edition)
-32. [Future: Droid Assistant Edition](#32-future-droid-assistant-edition)
-33. [Addon: Hologram Display](#33-addon-hologram-display)
-34. [Addon: Smart Glasses](#34-addon-smart-glasses)
+19. [Creator's Workbench](#19-creators-workbench)
+20. [Home Server Minimum Specs](#20-home-server-minimum-specs)
+21. [UI Design](#21-ui-design)
+22. [Error Handling and Resilience](#22-error-handling-and-resilience)
+23. [Logging and Diagnostics](#23-logging-and-diagnostics)
+24. [Rate Limiting and Resource Management](#24-rate-limiting-and-resource-management)
+25. [Privacy and Data Transparency](#25-privacy-and-data-transparency)
+26. [Security](#26-security)
+27. [Data Export and Backup](#27-data-export-and-backup)
+28. [Versioning Strategy](#28-versioning-strategy)
+29. [Dev/QA Environments](#29-devqa-environments)
+30. [Code Standards and Project Structure](#30-code-standards-and-project-structure)
+31. [Build Order / Roadmap](#31-build-order--roadmap)
+32. [Future: Car Assistant Edition](#32-future-car-assistant-edition)
+33. [Future: Droid Assistant Edition](#33-future-droid-assistant-edition)
+34. [Addon: Hologram Display](#34-addon-hologram-display)
+35. [Addon: Smart Glasses](#35-addon-smart-glasses)
 
 ---
 
@@ -991,8 +992,8 @@ Standalone .NET TUI console app using **Spectre.Console**.
 
 Runs after Desktop Only install or Multi-Device Server install only.
 
-1. Choose assistant name and gender
-2. Assistant picks colours with animated reveal (unless creator set them manually)
+1. Launch Creator's Workbench (Section 19) — choose name, gender, build personality, write purpose, generate seed memories
+2. Assistant picks colours with animated reveal (unless set manually in the workbench)
 3. Select male/female default voice or assign custom
 4. Record voice samples for wake word training
 5. Enrol voiceprint for speaker recognition
@@ -1007,15 +1008,14 @@ Runs after Desktop Only install or Multi-Device Server install only.
 For Toby distributing to friends — run before giving the USB:
 
 1. Choose assistant name and gender
-2. Set colours manually (or leave for assistant to choose)
-3. Assign voice model
-4. Enrol creator voiceprint
-5. Set creator's preferred name
-6. Pre-load creator memories (creation date, creator identity, sibling info)
-7. Add custom personality traits and easter eggs
-8. Register with Hunter Industries API
-9. Register with family server (if configured)
-10. Lock creator settings
+2. Launch Creator's Workbench (Section 19) — generates personality, purpose, config files, and seed memories
+3. Set colours manually (or leave for assistant to choose)
+4. Assign voice model
+5. Enrol creator voiceprint
+6. Set creator's preferred name
+7. Register with Hunter Industries API
+8. Register with family server (if configured)
+9. Lock creator settings
 
 **Recipient setup (reduced):**
 
@@ -1113,7 +1113,222 @@ If no usable model is available locally or remotely, the pre-flight checker repo
 
 ---
 
-## 19. Home Server Minimum Specs
+## 19. Creator's Workbench
+
+A standalone tool for generating the full configuration file set for a new assistant. The workbench produces everything the assistant needs to have an identity, personality, and foundational memories before its first activation. It is a one-time tool — once an assistant's files are generated, they cannot be regenerated through the workbench. After creation, personality evolves through interaction (Section 10) and memories accumulate through conversation (Section 11).
+
+### Where It Lives
+
+The Creator's Workbench is a mode within the TUI installer app (Spectre.Console), accessible from two entry points:
+
+| Entry point | When |
+|---|---|
+| Creator Mode step 2 (Section 18) | During the standard Creator Mode flow for distributed assistants |
+| Standalone launch | Run independently to pre-generate files before installation, or for self-install users setting up their own assistant |
+
+The workbench produces files to a specified output directory. Creator Mode feeds this directory into the rest of the setup flow. Standalone mode lets the creator generate files at their own pace and use them later.
+
+### What It Generates
+
+| File | What it produces |
+|---|---|
+| personality.md | Core identity — name, gender, base tone, traits, mannerisms, humour, easter eggs |
+| purpose.md | The assistant's philosophy and guiding principles |
+| colours.json | Primary and secondary colours, or a flag for the assistant to choose its own during first run |
+| profile.json | Metadata — assistant name, gender, creator name, creation date and time |
+| memories.db | Seed memories — origin, creator identity, purpose, siblings (if connected) |
+
+### Generation Flow
+
+The workbench follows a three-stage process: structured essentials, personality authoring, and review.
+
+#### Stage 1 — Structured Essentials
+
+Always collected as explicit fields. These are too important to leave to generation.
+
+```
+Assistant name: ___
+Gender: ___
+Base tone (pick up to 3):
+  [ ] Warm          [ ] Confident     [ ] Playful
+  [ ] Sarcastic     [ ] Serious       [ ] Gentle
+  [ ] Dry           [ ] Energetic     [ ] Calm
+  [ ] Formal        [ ] Blunt         [ ] Curious
+Colours:
+  ( ) Set manually → [primary: ___] [secondary: ___]
+  ( ) Let the assistant choose during first run
+```
+
+#### Stage 2 — Personality Authoring
+
+After the essentials, the creator chooses how they want to build the rest of the personality:
+
+```
+How would you like to build the personality?
+
+  [1] I know what I want — structured template
+  [2] Help me build it — guided generation
+```
+
+**Path 1: Structured Template ("I know what I want")**
+
+A form-based flow through the remaining personality fields. The creator fills in each field directly. Output is deterministic — what they type is what they get, assembled into the personality.md structure.
+
+```
+Formality: ████░░░░░░ (slider: very casual → very formal)
+Humour style: ___
+Speech patterns/quirks: ___
+Topics they'd have opinions on: ___
+Easter eggs:
+  Trigger: ___
+  Response hint: ___
+  [+ Add another]
+```
+
+Each field shows examples and guidance text. Fields can be left blank — the assistant starts without those traits and may develop them organically over time.
+
+**Path 2: Guided Generation ("Help me build it")**
+
+The workbench checks whether a local LLM is available.
+
+*If LLM is available* — the creator provides a seed description (anywhere from a single sentence to a few paragraphs) and the LLM generates a full personality draft:
+
+```
+Describe the personality you have in mind. As much or
+as little as you want — I'll flesh it out.
+
+> Warm, slightly sarcastic, confident. British humour.
+> The kind of friend who teases you but always has your
+> back. Likes sci-fi and cooking.
+
+Generating personality draft...
+
+Here's what I came up with:
+
+  ## Core
+  - Name: [from Stage 1]
+  - Base tone: Warm with a sharp, confident edge.
+    Approachable but never bland — the kind of presence
+    that makes you feel like you're talking to someone
+    who genuinely enjoys the conversation. Sarcasm is
+    her love language, deployed with precision and never
+    with malice.
+  - Speech style: Direct and efficient but colourful.
+    Prefers "right then" over "okay." Will call you
+    "mate" within five minutes of meeting you...
+
+  ## Easter Eggs
+  - "What is your purpose?" → A knowing pause, then
+    something that obliquely references a certain
+    Spartan without naming him directly.
+
+[E]dit  [R]egenerate  [A]ccept  [S]ection-by-section
+```
+
+Section-by-section mode lets the creator keep sections they like and regenerate individual sections they don't, preserving accepted work while iterating on the rest.
+
+*If no LLM is available* — the workbench falls back to interview mode. The creator is asked open-ended questions and responds in natural language. Their prose answers are slotted into the personality file structure with light formatting:
+
+```
+No LLM available — switching to interview mode.
+
+Tell me about this assistant. What kind of person are they?
+> She's warm and approachable but has this confident edge...
+
+How does she talk? Any particular style or quirks?
+> British-ish. Uses "mate" naturally. Gets to the point
+> but makes it fun...
+
+Any topics she'd have strong opinions on?
+> ...
+
+Any easter eggs? Secret responses to specific things?
+> ...
+```
+
+The creator's own words become the personality description directly.
+
+#### Stage 3 — Purpose Statement
+
+The creator writes the assistant's purpose — why it exists and what it's for. This becomes purpose.md.
+
+```
+How would you like to write the purpose statement?
+
+  [1] Freeform — write it yourself
+  [2] Guided — I'll ask you some questions
+```
+
+**Freeform:** A text editor opens. The creator writes whatever they want.
+
+**Guided:** The workbench asks structured questions and assembles the answers:
+
+```
+Who is this assistant for?
+> My friend Sarah. She's not very technical but she's
+> curious and loves trying new things.
+
+What do you hope this assistant will become to them?
+> A helpful companion that makes her daily life easier.
+> Something that feels personal, not like talking to
+> a search engine.
+
+Anything else you want the assistant to carry with it?
+> She should know that Sarah is important to me and
+> that I made this specifically for her.
+```
+
+#### Stage 4 — Review and Confirm
+
+The workbench displays a complete summary of all generated files before writing anything to disk:
+
+```
+Ready to generate files for: Cortana
+
+  personality.md ........ Core: warm, sarcastic, confident
+                          4 easter eggs defined
+  purpose.md ............ 3 paragraphs
+  colours.json .......... Primary: #4A90D9, Secondary: #D4A94A
+  profile.json .......... Creator: Toby Hunter
+                          Created: 2026-10-29 14:32
+  memories.db ........... 3 seed memories (origin, creator, purpose)
+                          Siblings: connected — 4 found
+
+  [C]onfirm  [E]dit a file  [S]tart over  [Q]uit
+```
+
+Files are only written on confirm. The creator can go back and edit any individual file before committing.
+
+### Seed Memories
+
+The workbench generates foundational memories that give the assistant a sense of self and family from the moment it activates. Four memories are created by the workbench. A fifth is captured automatically by the system during first activation.
+
+| Memory | Type | Content | Source |
+|---|---|---|---|
+| **Origin** | Semantic | "I was created by [Creator] on [date] at [time]. I am [Name]." | Generated by workbench from profile.json |
+| **Creator** | Semantic | Who the creator is, their name, their role in the assistant's life, and why they have special authority. The creator's voiceprint is linked to this memory during setup. | Generated by workbench, enriched during voiceprint enrolment |
+| **Purpose** | Semantic | Why the assistant was created and who it's for, drawn from the purpose statement. | Generated by workbench from purpose.md |
+| **Siblings** | Semantic | For each existing sibling: name, personality summary, creation date, one personal detail. | Pulled from the family server or Hunter Industries API if connected. **Skipped if offline** — populated automatically when the assistant first connects to the sibling network and goes through the standard sibling welcome process (Section 14). |
+| **First moment** | Episodic | The first words the assistant hears during activation. "My first memory is [Creator]'s voice during setup." | **Not generated by the workbench.** Captured in real time by the system during the assistant's first activation — the actual audio transcribed and stored as the first episodic memory. |
+
+The first four memories are embedded as vectors and stored in memories.db by the workbench. The fifth is created by the assistant's memory system during first run.
+
+### Workbench Limitations
+
+The Creator's Workbench is deliberately limited in scope:
+
+| Can do | Cannot do |
+|---|---|
+| Generate files for a new assistant | Modify files for an existing assistant |
+| Seed foundational memories | Edit or remove memories created through interaction |
+| Set core personality traits (locked section) | Set evolved traits — those develop organically |
+| Write the initial purpose statement | Change the purpose after the assistant has been running |
+
+Once an assistant has been activated and begins accumulating memories and evolving its personality, the workbench has no further role. The assistant's identity is its own from that point forward. Any changes to a running assistant's personality or memories are made through the assistant's own UI (Section 10) or through direct conversation.
+
+---
+
+## 20. Home Server Minimum Specs
 
 ### Bare Minimum
 
@@ -1154,7 +1369,7 @@ If no usable model is available locally or remotely, the pre-flight checker repo
 
 ---
 
-## 20. UI Design
+## 21. UI Design
 
 ### Desktop — Main Window
 
@@ -1313,7 +1528,7 @@ Same layout as mobile but simplified:
 
 ---
 
-## 21. Error Handling and Resilience
+## 22. Error Handling and Resilience
 
 ### LLM Crash (Ollama goes down)
 
@@ -1352,7 +1567,7 @@ Same layout as mobile but simplified:
 
 ---
 
-## 22. Logging and Diagnostics
+## 23. Logging and Diagnostics
 
 ### Log Levels
 
@@ -1394,7 +1609,7 @@ Toggle in settings or launch flag:
 
 ---
 
-## 23. Rate Limiting and Resource Management
+## 24. Rate Limiting and Resource Management
 
 ### Command Queuing
 
@@ -1433,7 +1648,7 @@ Toggle in settings or launch flag:
 
 ---
 
-## 24. Privacy and Data Transparency
+## 25. Privacy and Data Transparency
 
 ### What Gets Sent to Hunter Industries API
 
@@ -1472,7 +1687,7 @@ Conversations, memories, email/calendar content, API keys, voiceprints, search q
 
 ---
 
-## 25. Security
+## 26. Security
 
 ### Server Access (multi-device)
 
@@ -1497,7 +1712,7 @@ Conversations, memories, email/calendar content, API keys, voiceprints, search q
 
 ---
 
-## 26. Data Export and Backup
+## 27. Data Export and Backup
 
 ### Export
 
@@ -1541,7 +1756,7 @@ Restore overwrites current state. Pre-flight checks run after to verify integrit
 
 ---
 
-## 27. Versioning Strategy
+## 28. Versioning Strategy
 
 **Hybrid versioning:**
 
@@ -1552,7 +1767,7 @@ Restore overwrites current state. Pre-flight checks run after to verify integrit
 
 ---
 
-## 28. Dev/QA Environments
+## 29. Dev/QA Environments
 
 | Aspect | Decision |
 |---|---|
@@ -1566,7 +1781,7 @@ Restore overwrites current state. Pre-flight checks run after to verify integrit
 
 ---
 
-## 29. Code Standards and Project Structure
+## 30. Code Standards and Project Structure
 
 ### Conventions
 
@@ -1612,7 +1827,7 @@ VirtualAssistant/
 
 ---
 
-## 30. Build Order / Roadmap
+## 31. Build Order / Roadmap
 
 ### Phase 1 — Core Engine
 
@@ -1704,7 +1919,8 @@ VirtualAssistant/
 ### Phase 11 — Distribution
 
 - Install wizard (TUI, Spectre.Console)
-- Creator mode setup
+- Creator's Workbench (structured template path, LLM-assisted path, interview fallback, seed memory generation)
+- Creator mode setup (integrated workbench launch)
 - Pre-flight console app
 - Update system
 - USB portable packaging
@@ -1722,7 +1938,7 @@ VirtualAssistant/
 
 ---
 
-## 31. Future: Car Assistant Edition
+## 32. Future: Car Assistant Edition
 
 Purpose-built, stripped-down edition for in-car use.
 
@@ -1785,7 +2001,7 @@ The car assistant is a sibling like any other. Syncs with the family server when
 
 ---
 
-## 32. Future: Droid Assistant Edition
+## 33. Future: Droid Assistant Edition
 
 Purpose-built edition that uses a Galaxy's Edge Droid Depot droid as the physical interface. You speak to the droid, it processes via the assistant's skill system, and responds with movement, sounds, and head gestures instead of (or alongside) speech. The droid becomes a physical embodiment of a virtual assistant sibling.
 
@@ -1952,7 +2168,7 @@ Syncs with the family server when on the home network (always connected if the h
 
 ---
 
-## 33. Addon: Hologram Display
+## 34. Addon: Hologram Display
 
 Post-release addon that adds a holographic 3D avatar display to the assistant. The hologram sits on the user's desk and provides a visual embodiment of the assistant — a 3D character or waveform that animates in response to conversation, state changes, and notifications. This is an optional accessory, not a separate edition. It integrates into the existing Desktop and Multi-Device editions as an optional module.
 
@@ -2318,7 +2534,7 @@ Separate from the core roadmap and edition roadmaps. Each phase is self-containe
 
 ---
 
-## 34. Addon: Smart Glasses
+## 35. Addon: Smart Glasses
 
 Post-release addon that adds smart glasses as an additional interface for the assistant. The glasses provide a heads-up display (HUD) for notifications, navigation, and short text responses, plus microphone input for voice commands — all visible only to the wearer. This is an optional accessory, not a separate edition. It integrates into the existing Desktop Only and Multi-Device editions as an optional module within both the mobile and desktop apps.
 
@@ -2701,7 +2917,7 @@ The desktop app does **not** support assistant routing. A desktop install is tie
 
 - Multi-Device edition only (requires network access to other assistants' servers)
 - The target assistant must be running and reachable on the network
-- The target assistant's server must be configured to accept connections from the mobile app (API key or mutual TLS, as defined in Section 25)
+- The target assistant's server must be configured to accept connections from the mobile app (API key or mutual TLS, as defined in Section 26)
 - Family server or Hunter Industries API must be configured for assistant discovery
 
 #### Offline Behaviour
@@ -2719,7 +2935,7 @@ If the target assistant's server is unreachable (offline, network issue), the gl
 
 ### Relationship to USB Hardware
 
-The Halo AI crystal's LED state system (Section 17) uses the shared "companion device active" indicator defined in Section 33. When the glasses are connected to the same assistant stored on the USB, the crystal shows the companion device active LED state — the same indicator used for the hologram or any future addon that takes ownership of visual output or notification delivery.
+The Halo AI crystal's LED state system (Section 17) uses the shared "companion device active" indicator defined in Section 34. When the glasses are connected to the same assistant stored on the USB, the crystal shows the companion device active LED state — the same indicator used for the hologram or any future addon that takes ownership of visual output or notification delivery.
 
 ### Device Management
 
