@@ -37,6 +37,7 @@
 33. [Future: Droid Assistant Edition](#33-future-droid-assistant-edition)
 34. [Addon: Hologram Display](#34-addon-hologram-display)
 35. [Addon: Smart Glasses](#35-addon-smart-glasses)
+36. [Later Skills Detail](#36-later-skills-detail)
 
 ---
 
@@ -239,7 +240,7 @@ public interface ISkill
 
 Skills declare their **connectivity requirement** (offline/online) and **default urgency level** for proactive notifications.
 
-### MVP Skills (36)
+### MVP Skills (38)
 
 1. Open/close applications
 2. Maths/conversions
@@ -277,16 +278,30 @@ Skills declare their **connectivity requirement** (offline/online) and **default
 34. Clipboard chain
 35. Session handoff
 36. Conversations (contextual chat, personality-driven responses, cross-session memory)
+37. Pomodoro/focus mode (configurable work/break intervals, ambient soundscapes — rain, coffee shop, white noise etc.)
+38. Habit/streak tracking (daily habits, streak counts, gentle reminders, progress summaries)
 
-### Later Skills (7)
+### Later Skills (15)
 
-1. Food ordering
-2. News briefing
-3. Package tracking
-4. Image description (needs multimodal model)
-5. Pomodoro/focus mode
-6. Habit/streak tracking
-7. Text extraction from images (OCR)
+Skills to be added post-MVP. Each depends on specific phases of the core roadmap being complete. Full detail in Section 36.
+
+| # | Skill | Depends on | Online |
+|---|---|---|---|
+| 1 | Food ordering assistance | Phase 5 (APIs) | Yes |
+| 2 | News briefing | Phase 5 (APIs) | Yes |
+| 3 | Package tracking | Phase 5 (APIs) | Yes |
+| 4 | Image description | Multimodal model | No |
+| 5 | Text extraction / OCR | Vision or OCR library | No |
+| 6 | NASA space skill | Phase 7 (personality) | Yes |
+| 7 | Space tracking skill | Phase 5 (APIs) | Yes |
+| 8 | Daily briefing | Phase 6 (proactive behaviour) | Mixed |
+| 9 | Smart home control | Phase 5 (APIs) | LAN |
+| 10 | Travel assistance | Phase 5 (APIs) | Yes |
+| 11 | Media recommendations | Phase 7 (personality) | Yes |
+| 12 | HomeBillsTracker integration | Phase 5 + HomeBillsTracker Phase 7 | LAN |
+| 13 | Custom routines | Phase 5 (skills to chain) | Mixed |
+| 14 | Voicemail transcription | Phase 8 (SIP telephony) | No |
+| 15 | Document generation | Phase 4 (desktop UI) | No |
 
 ### Offline Skill Behaviour
 
@@ -790,7 +805,7 @@ The Fuel Finder API provides real-time UK fuel prices as open data, mandated by 
 
 **Also available as:** CSV download (updated twice daily) and email subscription — useful as a backup if the API is unavailable.
 
-**How the assistant uses it:** When the user requests fuel-related navigation ("cheapest diesel nearby"), the assistant queries Fuel Finder for stations within a radius of the user's location, compares diesel prices, and presents the cheapest option(s) before starting navigation.
+**How the assistant uses it:** Two modes — standalone price queries and navigation-linked queries. For standalone queries ("where's the cheapest petrol near me?", "how much is diesel at the BP on the high street?"), the assistant queries Fuel Finder and presents prices without assuming the user wants directions. For navigation-linked queries ("navigate to the cheapest diesel nearby"), it queries prices, presents the cheapest option(s), and starts navigation on confirmation. The assistant can also compare prices at a specific station against nearby alternatives ("am I getting a good deal here?").
 
 ---
 
@@ -1867,11 +1882,12 @@ VirtualAssistant/
 
 ### Phase 5 — Full MVP Skills
 
-- Remaining 32 skills
+- Remaining 34 skills (including Pomodoro/focus mode and habit/streak tracking)
 - External API integrations
 - SearXNG and LibreTranslate setup
 - OSRM with map data
 - Offline/online categorisation and queue behaviour
+- Phase 5 also unblocks later skills that depend on external API infrastructure: food ordering assistance, news briefing, package tracking, space tracking, smart home control, travel assistance, and HomeBillsTracker integration (see Section 36)
 
 ### Phase 6 — Proactive Behaviour
 
@@ -3011,3 +3027,492 @@ Separate from the core roadmap, edition roadmaps, and hologram addon roadmap. Ea
 | G10 — Driving Safety | Speed-based GPS auto-lockout (visual only — audio continues), manual "I'm a passenger" override (voice + app toggle), auto-reset on journey end (speed zero for 2+ minutes), configurable speed threshold and detection duration |
 | G11 — Handover | BLE connection handover between mobile and desktop apps, priority device configuration, seamless content continuity on device switch, automatic fallback when priority device is out of range |
 | G12 — Assistant Routing | Assistant discovery via family server/Hunter Industries API, glasses routing setting in mobile app, dual connection management (phone assistant + glasses assistant simultaneously), fallback to phone assistant when target is unreachable, automatic reconnect |
+
+---
+
+## 36. Later Skills Detail
+
+Detailed specifications for each post-MVP skill listed in Section 8. These skills are developed after the core 12-phase roadmap reaches the required dependencies.
+
+---
+
+### 36.1 Food Ordering Assistance
+
+**Depends on:** Phase 5 (external APIs), Phase 2 (memory)
+
+Helps the user decide what to order and hands off to the delivery platform for checkout. Direct programmatic ordering is not feasible — Deliveroo, Uber Eats, and Just Eat do not offer public consumer-facing APIs. Order placement is locked behind first-party integrations for fraud prevention and payment security. Even Siri, Google Assistant, and Alexa can only place orders through bespoke platform partnerships, not public APIs.
+
+**What the assistant does:**
+
+- **Discovery** — "I fancy something spicy", "what's open near me?", "something quick and cheap"
+- **Favourite tracking** — remembers restaurants, dishes, and orders per user via the memory system
+- **Pattern detection** — learns recurring habits and suggests proactively ("it's Friday evening, shall I pull up your usual from The Chippy?")
+- **Dietary awareness** — factors in dietary preferences, allergies, and budget constraints stored in user preferences
+- **Recent history** — avoids suggesting the same thing repeatedly, considers what the user has ordered recently
+- **Deep link handoff** — opens Deliveroo, Uber Eats, or Just Eat to the specific restaurant or search result via URL scheme, minimising friction. User completes checkout in the delivery app.
+- **Pre-built basket** — where delivery platforms support URL parameters for items, pre-populate the basket before handoff
+
+**Supported platforms (UK):**
+
+| Platform | Deep link support | Notes |
+|---|---|---|
+| Deliveroo | Yes — restaurant pages via URL | `deliveroo.co.uk/menu/<area>/<restaurant>` |
+| Uber Eats | Yes — restaurant and search URLs | `ubereats.com/gb/store/<restaurant>` |
+| Just Eat | Yes — restaurant pages via URL | `just-eat.co.uk/restaurants-<name>` |
+
+**Memory integration:**
+
+- Favourite restaurants and typical orders stored as structured memory entries
+- Dietary preferences and budget stored in user preferences (not per-conversation)
+- Order history logged for pattern detection (day of week, time, cuisine type)
+
+---
+
+### 36.2 News Briefing
+
+**Depends on:** Phase 5 (external APIs)
+
+Curated news summaries from configurable sources. Delivered on-demand or as a module within the daily briefing.
+
+**Sources:**
+
+- RSS/Atom feeds (user-configurable list)
+- SearXNG instance (already used by the web search skill) for broader coverage
+
+**Behaviour:**
+
+- Summarises headlines into a conversational briefing using the LLM
+- User configures preferred topics and sources in settings (e.g. technology, UK news, science)
+- Filters out duplicate stories across sources
+- Can be requested on-demand ("what's in the news?") or delivered as part of the daily briefing
+- Respects personality — the assistant's delivery style and any developed interests influence how stories are presented
+
+---
+
+### 36.3 Package Tracking
+
+**Depends on:** Phase 5 (external APIs)
+
+Tracks parcels across multiple carriers from a single conversational interface.
+
+**Supported carriers (initial):**
+
+- Royal Mail (Track & Trace)
+- DPD
+- Hermes/Evri
+- Amazon Logistics
+- DHL
+- FedEx
+- UPS
+
+**Behaviour:**
+
+- User provides tracking number — assistant auto-detects carrier from format
+- Periodic polling for status updates (configurable interval)
+- Proactive notifications on status change ("your parcel from Amazon is out for delivery")
+- "Where's my parcel?" query returns status of all active shipments
+- Tracking numbers stored in memory, auto-archived after delivery confirmed
+- Supports multiple concurrent shipments
+
+---
+
+### 36.4 Image Description
+
+**Depends on:** Multimodal model support (vision-capable LLM)
+
+Describes the content of an image provided by the user. Requires the LLM strategy (Section 7) to support a model with vision capabilities, either locally (e.g. LLaVA via Ollama) or via a cloud endpoint.
+
+**Behaviour:**
+
+- User provides an image (screenshot, photo, file path)
+- Assistant describes the content in natural language
+- Can answer follow-up questions about the image
+- Useful for accessibility, identifying objects, reading handwriting
+
+---
+
+### 36.5 Text Extraction / OCR
+
+**Depends on:** Vision-capable model or dedicated OCR library (Tesseract)
+
+Extracts text from images — signs, documents, screenshots, handwritten notes.
+
+**Behaviour:**
+
+- User provides an image containing text
+- Assistant extracts and returns the text content
+- Can copy extracted text to clipboard
+- Supports follow-up actions ("translate this", "summarise this", "email this to...")
+- Implementation option: Tesseract OCR library (same as HomeBillsTracker uses) for a dedicated offline-capable path, or multimodal LLM for a more flexible but model-dependent approach
+
+---
+
+### 36.6 NASA Space Skill
+
+**Depends on:** Phase 7 (personality evolution)
+
+Integration with NASA's public APIs for space content — on-demand queries and proactive curation driven by the personality system. All NASA APIs are free for personal use. A single registered API key provides 1,000 requests per hour, which is far more than a single-user assistant requires.
+
+**API key:** Register at https://api.nasa.gov/ — free, no usage fees, no cost tiers.
+
+**Integrated APIs:**
+
+| API | What it provides | Assistant use |
+|---|---|---|
+| APOD | Daily curated space image/video with expert explanation | Daily briefing staple, personality reacts to and curates content |
+| NEO / Asteroids NeoWs | Near-Earth object close approaches, size, orbital data | Proactive alerts for notable approaches |
+| DONKI (Space Weather) | Solar flares, geomagnetic storms, CMEs, near-real-time | Aurora alerts, solar storm warnings, space weather briefing |
+| Mars Rover Photos | Photos from Curiosity, Opportunity, Spirit by sol/date/camera | "Here's what Curiosity saw today" — ongoing narrative |
+| EPIC | Full-disc Earth images from DSCOVR satellite, near-daily | "Here's Earth from a million miles away today" |
+| Earth / Landsat | Satellite imagery for specific lat/lon coordinates | "Here's your city from space" — location-based imagery |
+| NASA Image and Video Library | Full media archive, searchable by keyword | On-demand queries ("show me Saturn images") |
+
+**Two modes:**
+
+1. **On-demand** — user asks a question, assistant queries the relevant API. "What's NASA's picture of the day?", "are there any asteroids approaching Earth this week?", "show me the latest Mars rover photos."
+
+2. **Proactive** — tied into the personality evolution system (Phase 7). If the assistant develops an interest in space, it curates and shares noteworthy content during conversation or via the daily briefing. The personality system's interest tracking and organic hobby development (Section 10) governs how and when the assistant shares space content. Examples:
+   - "I saw today's APOD — it's a stunning shot of the Carina Nebula, want to see it?"
+   - "Heads up, a 200-metre asteroid passes within 2 million miles on Thursday."
+   - "There's a G2 geomagnetic storm forecast — you might see aurora tonight if skies are clear."
+   - Following a Mars rover's journey over time, sharing notable terrain or discoveries.
+
+**Daily briefing module:** When the daily briefing skill is active and the space module is enabled, the assistant includes a space highlights segment — APOD, any notable asteroid approaches, aurora-worthy geomagnetic activity.
+
+---
+
+### 36.7 Space Tracking Skill
+
+**Depends on:** Phase 5 (external APIs)
+
+Tracks the International Space Station, upcoming launches, and space news using third-party (non-NASA) APIs. Separate from the NASA space skill because these are independent services, but content feeds into the same space briefing when both skills are active.
+
+**APIs:**
+
+| Service | API | Auth | Rate limit | What it provides |
+|---|---|---|---|---|
+| Open Notify | open-notify.org | None | Unrestricted | ISS current position, crew count and names |
+| N2YO | n2yo.com/api | Free key | Free tier available | ISS pass predictions by location, satellite tracking |
+| Launch Library 2 | thespacedevs.com/llapi | None | 15 req/hr (free) | Launch schedule across all agencies, countdown data |
+| Spaceflight News API | spaceflightnewsapi.net | None | Unrestricted | Space news articles, blogs, reports |
+
+**Behaviour:**
+
+- **ISS tracking** — "where is the ISS right now?", "when can I see the ISS tonight?" (pass predictions based on user location)
+- **Launch schedule** — "what's the next rocket launch?", "any launches this week?" Proactive countdown alerts for notable launches (crewed missions, first flights, etc.)
+- **Space news** — "what's happening in space?" pulls recent articles and summarises conversationally
+
+**Daily briefing module:** When included in the daily briefing, contributes ISS pass times (if visible from user's location today), upcoming launches within the next 48 hours, and any major space news.
+
+**Relationship to NASA space skill:** Both skills contribute to the space segment of the daily briefing. If only one is active, the briefing uses whichever is available. If both are active, the briefing combines content — NASA APOD and asteroid alerts alongside ISS passes and launch countdowns. The user can disable either skill's contribution to the briefing independently.
+
+---
+
+### 36.8 Daily Briefing
+
+**Depends on:** Phase 6 (proactive behaviour)
+
+A standalone, toggleable skill that delivers a personalised briefing when the user first interacts with the assistant each day. The briefing aggregates content from multiple sources into a single conversational summary.
+
+**Activation:**
+
+- Toggled on/off in settings (default: off)
+- When enabled, the assistant offers the briefing on the user's first interaction of the day
+- The user can decline ("not now") or request it later ("give me my briefing")
+- Only offered once per day unless explicitly requested again
+
+**Time-aware delivery:**
+
+The briefing adapts its content based on when the user first interacts:
+
+| Time of day | Content |
+|---|---|
+| Morning (before noon) | Full day-ahead briefing — weather, full calendar, reminders, space highlights, overnight notifications |
+| Afternoon (noon–5pm) | Rest-of-day briefing — remaining calendar events, anything new today, space highlights if not yet shared |
+| Evening (after 5pm) | Wind-down briefing — tomorrow's preview (weather, first calendar events), anything unresolved from today, space highlights |
+| Late night (after 10pm) | Minimal — only pending reminders or urgent items |
+
+**Configurable modules:**
+
+Each module can be toggled on/off independently in settings. The assistant delivers enabled modules in a sensible order based on the time of day.
+
+| Module | Source skill | Content |
+|---|---|---|
+| Weather | Weather (MVP #4) | Today's forecast, notable conditions |
+| Calendar | Calendar management (MVP #9) | Today's events and schedule |
+| Reminders | Timers/alarms/reminders (MVP #3) | Due or overdue reminders |
+| News | News briefing (Later #2) | Top headlines from configured sources |
+| Space | NASA space skill (Later #6) + Space tracking (Later #7) | APOD, asteroid alerts, aurora alerts, ISS passes, upcoming launches |
+| Bills & shopping | HomeBillsTracker integration (Later #12) | Unread alerts, upcoming bills, spending summary |
+| Overnight notifications | Notification system (Phase 6) | Anything that arrived while the user was away |
+
+**Delivery style:**
+
+- **Narrative mode (default)** — the assistant delivers the briefing conversationally, with personality and natural transitions between topics. Example: "Morning! It's looking grey out there — rain's expected around lunchtime. You've got the dentist at 2 and that team call at 4. Oh, and today's NASA picture is a gorgeous shot of the Pillars of Creation."
+- **Structured mode (toggle in settings)** — concise, categorised delivery. Example: "Weather: overcast, rain from noon, 14°C. Calendar: dentist at 2pm, team call at 4pm. Space: APOD is the Pillars of Creation."
+
+Modules that depend on later skills not yet installed are simply absent from the briefing — no placeholder or error.
+
+---
+
+### 36.9 Smart Home Control
+
+**Depends on:** Phase 5 (external APIs)
+
+**⚠ Security review required before implementation.** Smart home control through an LLM-based assistant introduces significant security concerns — unauthorised access to locks/alarms via compromised assistant, voice spoofing, accidental LLM misinterpretation of conversation as commands, and the assistant becoming an additional attack surface on the home network. This skill requires a dedicated security review before any implementation begins. The scope (read-only status vs full control, which device categories are permitted, what mitigations are sufficient) will be determined during that review.
+
+**Possible approaches (to be decided after security review):**
+
+| Approach | Risk | Value |
+|---|---|---|
+| Full control (lights, locks, heating, alarms, etc.) | High — security-sensitive devices controllable via LLM | Highest convenience |
+| Restricted control (lights, media, thermostat only — no locks, alarms, cameras) | Medium — excludes security-sensitive devices | Good convenience, reduced risk |
+| Read-only status (report state, no control) | Low — no actions taken, information only | Useful for daily briefing, no control risk |
+
+**Technical design (unchanged regardless of scope decision):**
+
+Primary integration target is Home Assistant, which provides a well-documented REST API and supports a vast range of devices. Direct device APIs (Philips Hue, MQTT) are secondary options for users without Home Assistant.
+
+**Home Assistant integration:**
+
+- Connects via Home Assistant REST API (long-lived access token)
+- Discovers available devices and their capabilities automatically
+- Device state queries — "is the front door locked?", "what's the living room temperature?"
+- Device control (if permitted by scope) — "turn off the bedroom lights", "set the heating to 20 degrees"
+- Scene activation (if permitted by scope) — "set movie mode", "goodnight"
+- Operates over LAN — no internet required
+
+**Direct device support (without Home Assistant):**
+
+| Protocol | Devices | Notes |
+|---|---|---|
+| Philips Hue API | Hue lights and accessories | Local API via bridge |
+| MQTT | Any MQTT-compatible device | Requires MQTT broker on LAN |
+
+**Behaviour:**
+
+- Devices and their friendly names are cached after initial discovery
+- Natural language mapping — the LLM maps conversational requests to the correct device and action
+- Confirmation for irreversible or security-sensitive actions
+- Status can be included in the daily briefing if the user enables it (e.g. "the heating is set to 19, front door is locked")
+
+---
+
+### 36.10 Travel Assistance
+
+**Depends on:** Phase 5 (external APIs)
+
+Helps with travel planning, flight tracking, and journey information. Covers both the user's own travel and tracking flights for others (e.g. monitoring parents' holiday flights).
+
+**Flight tracking:**
+
+- Track any commercial flight by flight number
+- Real-time status updates — delays, gate changes, diversions, landing
+- Proactive notifications on status change ("your parents' flight BA249 has landed at Heathrow")
+- Multiple concurrent flight watches supported
+- Auto-archive after flight completes
+
+**APIs:**
+
+| Service | What it provides | Notes |
+|---|---|---|
+| AviationStack / FlightAware | Flight status, tracking, schedules | Free tiers available |
+| National Rail (UK) | Train schedules, live departures, disruptions | Free API key from National Rail Enquiries |
+| TfL API (London) | Tube, bus, DLR status and journey planning | Free, no key needed |
+
+**Additional features:**
+
+- **Itinerary building** — "I'm going to Edinburgh on the 15th" starts an itinerary the assistant can add to (flights, hotels, activities, notes)
+- **Packing list generation** — suggests items based on destination, weather forecast, trip duration, and trip type (business, holiday, etc.)
+- **Public transport** — "when's the next train to Manchester?", "is the Northern Line running?"
+- **Journey context** — if the user has a flight today, the assistant factors it into the daily briefing and proactive reminders ("you should leave for the airport in about two hours based on current traffic")
+
+---
+
+### 36.11 Media Recommendations
+
+**Depends on:** Phase 7 (personality evolution)
+
+Movie, TV, and book recommendations that learn the user's taste over time. Integrated with the personality system so the assistant can develop and express its own opinions.
+
+**APIs:**
+
+| Service | What it provides | Auth | Cost |
+|---|---|---|---|
+| TMDB (The Movie Database) | Movie and TV metadata, ratings, trailers, recommendations | Free API key | Free |
+| Open Library | Book metadata, covers, author info, reading lists | None | Free |
+
+**Behaviour:**
+
+- **On-demand recommendations** — "suggest a film for tonight", "what's a good sci-fi book?", "anything good on Netflix right now?"
+- **Taste learning** — tracks what the user watches/reads and their reactions via the memory system. Builds a preference profile over time (genres, directors, actors, themes, authors).
+- **Context-aware suggestions** — factors in mood, time available ("I've got 30 minutes" → TV episode, not a film), who's watching ("something the kids would like"), and what's been watched recently (avoids repeats, suggests variety).
+- **Personality integration** — through the personality evolution system (Phase 7), the assistant can develop its own taste in media and discuss recommendations as a peer. "I think you'd love this one" rather than "users who liked X also liked Y." The assistant's opinions evolve organically — it doesn't arrive with pre-formed taste.
+- **Watchlist/reading list** — maintains a list the user can add to and pull from. "Add that to my list", "what's on my watchlist?"
+
+---
+
+### 36.12 HomeBillsTracker Integration
+
+**Depends on:** Phase 5 (external APIs) + HomeBillsTracker project reaching Phase 7 (API)
+
+Connects the assistant to a running HomeBillsTracker instance — the self-hosted household management app for tracking food shopping and household bills. The assistant acts as a voice/text interface to the tracker's REST API, not a replacement for it. All data lives in HomeBillsTracker; the assistant queries and contributes to it.
+
+**Connection:**
+
+- Connects via HomeBillsTracker REST API using an API key linked to a bot user account
+- API key scope, generation, and revocation managed in HomeBillsTracker's admin panel
+- Operates over LAN (same network as the Pi hosting HomeBillsTracker)
+- Health check via `/api/health` — assistant can monitor tracker availability
+
+**Conversational queries:**
+
+| User says | API endpoint | Response |
+|---|---|---|
+| "How much did I spend this week?" | `GET /api/shopping/summary` | Weekly spend summary with comparison to last week |
+| "How much are burgers at Tesco?" | `GET /api/products/search?q=burgers` | Current price, price history, cross-store comparison |
+| "What's my electricity bill looking like?" | `GET /api/bills/electricity/forecast` | Forecast with confidence interval and seasonal context |
+| "Any price changes I should know about?" | `GET /api/analytics/price-changes` | Recent price increases across tracked products |
+| "What's on the shopping list?" | `GET /api/shopping/lists/{id}/items` | Items on the active shopping list |
+| "What are my projected annual costs?" | `GET /api/analytics/yearly-projection` | Projected annual spend across all categories |
+
+**Quick actions:**
+
+| User says | API endpoint | What happens |
+|---|---|---|
+| "I just spent £40 at Tesco" | `POST /api/receipts` | Quick receipt entry logged against the user's bot account |
+| "Add milk to the shopping list" | `POST /api/shopping/lists/{id}/items` | Item added to the active list for the relevant store |
+
+**Proactive behaviour (daily briefing module):**
+
+When included in the daily briefing, the assistant pulls unread alerts from `/api/alerts` and surfaces them conversationally:
+
+- Price increase alerts — "Pack of Burgers at Tesco has gone up 15% since last month"
+- Bill projection alerts — "Your electricity bill is projected to be 20% higher than last quarter — seasonal increase expected"
+- Spending anomaly alerts — "This week's shop was £30 above your 4-week average"
+- Contract renewal reminders — "Broadband contract ends in 30 days"
+- Upcoming bill due dates
+
+After surfacing alerts, the assistant marks them as read via `PATCH /api/alerts/{id}/read` so they are not repeated.
+
+---
+
+### 36.13 Custom Routines
+
+**Depends on:** Phase 5 (full skill set to chain)
+
+User-defined multi-skill sequences triggered by a single voice command or schedule. A routine chains actions from any installed skill into a named sequence the user can invoke naturally.
+
+**How routines are created:**
+
+- **Conversational** — "Create a routine called 'movie time' that dims the living room lights, turns on the TV, and suggests something to watch." The assistant confirms the steps and saves it.
+- **Settings UI** — a routine builder where the user adds steps from available skills, names the routine, and optionally assigns a schedule or trigger.
+
+**Routine structure:**
+
+Each routine is an ordered list of steps. Each step is a skill action with parameters.
+
+```
+Routine: "Movie Time"
+  1. Smart home → dim living room lights to 20%
+  2. Smart home → turn on TV
+  3. Media recommendations → suggest a film
+
+Routine: "Goodnight"
+  1. Smart home → turn off all lights
+  2. Timers/alarms → set alarm for 7:00am
+  3. System controls → enable Do Not Disturb
+  4. Daily briefing → deliver tomorrow's preview (weather + first calendar event)
+
+Routine: "Heading Out"
+  1. Smart home → turn off all lights
+  2. Smart home → lock front door
+  3. Smart home → set heating to 16°C
+  4. Weather → current conditions summary
+```
+
+**Behaviour:**
+
+- Steps execute sequentially — each waits for the previous to complete
+- If a step fails (e.g. smart home device unreachable), the assistant reports the failure and continues with the remaining steps unless the user has marked the step as required
+- Steps that depend on skills not yet installed are skipped with a note
+- Routines can be triggered by voice ("run movie time"), by schedule (e.g. "run goodnight at 11pm"), or by the assistant suggesting it contextually ("it's 11pm, shall I run your goodnight routine?")
+- Routines are editable — "add 'check the front door lock' to my goodnight routine"
+- Routines are per-user in multi-user setups
+
+**Relationship to startup routines (MVP #30):**
+
+Startup routines are a specific system behaviour — what happens when the assistant first starts. Custom routines are user-defined and can be triggered at any time. A user could create a custom routine and assign it as their startup routine if they want to replace the default behaviour.
+
+---
+
+### 36.14 Voicemail Transcription
+
+**Depends on:** Phase 8 (SIP telephony)
+
+Transcribes and manages voicemails received through the SIP telephony system. Voicemails arrive as audio files from Asterisk; the assistant transcribes them with Whisper (already integrated for STT in Phase 3) and presents them conversationally.
+
+**Behaviour:**
+
+- When a call is missed or sent to voicemail, Asterisk records the audio
+- The assistant transcribes the recording using Whisper
+- The transcription is stored alongside the original audio
+- The assistant proactively notifies the user of new voicemails based on the notification escalation system (Section 12)
+
+**Conversational interface:**
+
+| User says | Response |
+|---|---|
+| "Any voicemails?" | Summary of unread voicemails — caller, time, and a one-line summary of each |
+| "Play the voicemail from Mum" | Plays the original audio through the current output device |
+| "What did she say?" | Reads the full transcription conversationally |
+| "Delete it" / "Archive it" | Manages the voicemail |
+| "Call her back" | Initiates a SIP call to the caller's number |
+
+**Daily briefing module:** When included in the daily briefing, the assistant mentions unread voicemails — "You've got two voicemails — one from your mum about Sunday lunch, and one from the dentist confirming Thursday's appointment."
+
+**Storage:**
+
+- Original audio files retained for playback
+- Transcriptions stored as text in the memory/data system
+- Configurable retention period (default: 30 days, then auto-archive)
+
+---
+
+### 36.15 Document Generation
+
+**Depends on:** Phase 4 (desktop UI for preview and export)
+
+Full document creation beyond quick text drafting (MVP #20). Where quick text drafting handles short-form content like emails, messages, and notes, document generation produces structured, multi-section documents with formatting and export to standard file formats.
+
+**What it produces:**
+
+- Formal letters (to councils, companies, landlords, etc.)
+- Cover letters and CVs
+- Reports and summaries
+- Structured proposals
+- Any user-defined document type
+
+**Behaviour:**
+
+- **Conversational drafting** — "Write a letter to the council about the missed bin collection on Monday. Our address is 12 Oak Street. Reference number BIN-2026-4451." The assistant drafts the letter with proper formatting (date, addresses, salutation, body, sign-off).
+- **Iterative refinement** — "Make the tone more formal", "add a paragraph about the previous missed collection in September", "shorten it"
+- **Voice dictation** — the user dictates content and the assistant structures it into a document, adding formatting, correcting grammar, and organising sections
+- **Template support** — saved templates for recurring document types (e.g. a complaint letter template with placeholders for address, reference, details)
+
+**Export formats:**
+
+| Format | Method |
+|---|---|
+| PDF | Generated via a .NET PDF library (QuestPDF or similar) |
+| Word (.docx) | Generated via Open XML SDK |
+| Plain text | Direct output |
+| Markdown | Direct output |
+
+**Preview:**
+
+Documents are previewed in the desktop UI before export. The user can review formatting, make changes conversationally, and export when satisfied.
+
+**Relationship to quick text drafting (MVP #20):**
+
+Quick text drafting is short-form, inline, and immediate — "draft a reply to this email", "write a quick message to Dave." Document generation is long-form, structured, and produces a file. The two skills are complementary — quick text drafting for everyday communication, document generation for anything that needs formatting and export.

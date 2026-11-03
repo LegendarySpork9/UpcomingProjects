@@ -442,6 +442,14 @@ ExternalPriceSources (future)
     ```
   - `GET /api/products/search?q={query}` → cross-store product search
   - `GET /api/shopping/lists` → active shopping lists
+  - `GET /api/shopping/lists/{id}/items` → items on a specific shopping list
+  - `POST /api/shopping/lists/{id}/items` → add item to a shopping list (for virtual assistant "add X to the list" commands)
+    ```json
+    {
+      "product_id": 42,
+      "quantity": 1
+    }
+    ```
   - `POST /api/receipts` → quick receipt entry (for virtual assistant "log a spend" commands)
 
   **Bills handlers:**
