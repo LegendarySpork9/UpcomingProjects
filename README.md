@@ -1,7 +1,7 @@
 # Projects
 These are projects that I have planned out to work on at a later date. They are all primarily for the purpose of personal development. Any projects that I intend to sell will have "(£)" in the title. All these plans are subject to copyright. Copyright © 2026 Toby Hunter. All rights reserved.
 
-**This was last updated on the 26/10/2026**
+**This was last updated on the 03/11/2026**
 
 ## Linux Compat
 Where it makes sense, I am going to make existing applications that are not compatable with Linux, compatable. This excludes any project specifically designed with windows in mind like the Google Drive Sync.
@@ -64,6 +64,9 @@ Galaxy Edge Droids are a little useless outsite of the park which is a little di
 
 ## Translation Site
 Translating English to fictional languages like Kryptonian or making it accented like German is complicated and in cases not easy to understand. This plan is to create a website where people can input English text and it will then translate that to the given language. This is a site that will hopefully help people to learn how to translate to other languages as it explains how it reached the translation.
+
+## Home Bills Tracker
+A website where you can track bills related to home owning/renting such as food shopping, gas, water, council tax etc. Here you scan receipts, enter information and build a history of the expendature of the property. It runs analytics on the entered data to help people better understand their household. You can build shopping lists to predict expendature as well as predict bill price based on past information.
 
 ## Bones and Brew (£)
 ### Summary
