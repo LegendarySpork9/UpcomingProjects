@@ -567,20 +567,24 @@ Users may upload 3D avatar models for the hologram display, including models of 
 
 #### Voice and TTS Models
 
-**Using original voice recordings from games/media:**
+**Personal use (your own installation):**
 
-- Copyrighted by the publisher — same grey area as model extraction
-- Voice actors have additional right of publicity protections over their voice (stronger in the US under California/Tennessee law, weaker in the UK)
+- Clone any character voice you want for your own private use — same as any hobbyist project
+- Use reference clips from games, cartoons, movies, audiobooks as training data for voice cloning
+- Practical enforcement risk for purely private, non-commercial use is effectively nil
+- This is widely done in the hobbyist community (JARVIS voice assistants, character TTS projects, etc.)
+
+**Distribution (giving to others or publishing):**
+
+- Do not ship or distribute the assistant with pre-loaded voice models cloned from copyrighted characters
+- Do not distribute trained voice models based on voice actors' performances
+- Distributed versions should ship with either the default voices (edge-tts) or commissioned original performances
+- Voice actors have right of publicity protections over their voice (stronger in the US under California/Tennessee law, weaker in the UK)
 - Emerging legislation (Tennessee ELVIS Act, California AB 2602/AB 1836, proposed federal NO FAKES Act) strengthens voice performance protections
-- Using original recordings as training data for AI/TTS is legally riskier than simple playback
-
-**AI voice cloning of real actors:**
-
-- Legally risky under right of publicity laws, even for personal use
 - Landmark cases (Midler v. Ford 1988, Waits v. Frito-Lay 1992) established that deliberately imitating a distinctive, widely-known voice to sell a product is actionable
-- Not recommended for this project
+- Risk is specifically tied to distribution, commercial use, and public-facing use — not private personal use
 
-**Commissioning original voice performances (recommended approach):**
+**Commissioning original voice performances (recommended for distribution):**
 
 - Hiring a voice actor to perform in the style/personality of a fictional character is legally defensible
 - Direct the actor toward the character's style and tone, not to clone the specific original actor
@@ -597,9 +601,9 @@ Users may upload 3D avatar models for the hologram display, including models of 
 - Redistribution terms — if the TTS voice ships with distributed versions, the contract must explicitly allow this
 - Revocation rights and data purging timeline
 
-**What the project must never do:**
+**What the project must never do when distributing:**
 
-- Never include instructions for extracting copyrighted assets from games or media
+- Never ship copyrighted voice models or cloned character voices with distributed versions
 - Never ship copyrighted content from third parties
 - Never present custom content as officially affiliated with any IP holder
 - Never use trademarked character names (e.g. "KITT", "Cortana", "Knight Rider") in distributed product branding
