@@ -49,12 +49,41 @@ Data files (in app directory):
 |-------|-----------|-----------|
 | Language | Python 3.12+ | User has Python experience, rich library ecosystem |
 | AO3 Client | ao3.py (`pip install ao3.py`) | Async, typed, supports login + WorkSearchOptions with `relationship_names` filter, paginated search |
+| Fimfiction Client | requests + OAuth2 | Official REST API (v2), JSON:API spec, character tag search |
+| XenForo (SB/SV) | feedparser | RSS feed parsing for SpaceBattles and Sufficient Velocity forum listings |
+| FFNet (experimental) | curl_cffi | Cloudflare bypass via TLS fingerprint impersonation. Fragile — may break when Cloudflare updates |
+| Wattpad (experimental) | requests | Undocumented internal API endpoints. May break without notice |
+| Quotev (experimental) | requests + BeautifulSoup | Web scraping of tag listing pages |
 | HTTP | aiohttp (ao3.py dependency) | Async HTTP client used internally by ao3.py |
 | Email | smtplib + email.mime (stdlib) | No external dependency needed, works with any SMTP provider |
 | Email Templates | string.Template (stdlib) | Lightweight HTML templating without pulling in Jinja2 |
-| State | JSON file | Simple, no database needed — just a dict of ship → list of seen work IDs |
+| State | JSON file or SQLite | JSON for standalone use (default), SQLite for shared state with Bibliotheca Fabulae |
 | Logging | logging (stdlib) | RotatingFileHandler for log rotation |
 | Scheduling | Windows Task Scheduler | Native to Windows, no daemon process needed |
+
+### Site adapter architecture
+
+Each supported site implements a common adapter interface:
+
+```python
+class SiteAdapter:
+    async def authenticate(config) -> bool
+    async def search(tag, max_pages) -> list[WorkResult]
+    async def validate_tag(tag) -> bool
+    def get_tag_format_help() -> str
+```
+
+| Adapter | Tier | Search Capability | Tag Format |
+|---------|------|-------------------|------------|
+| AO3 | Stable | Relationship tags | Canonical: `Character A/Character B` |
+| Fimfiction | Stable | Character tags | Character IDs: `#fluttershy #rainbow-dash` |
+| SpaceBattles | Stable | Fandom/character tags (no pairings) | Forum tags: `worm`, `taylor-hebert` |
+| Sufficient Velocity | Stable | Fandom/character tags (no pairings) | Forum tags (same as SpaceBattles) |
+| Wattpad | Experimental | Freeform ship-name tags | Concatenated: `drarry`, `bakudeku` |
+| Quotev | Experimental | Freeform ship-name tags | Freeform: `drarry`, `draco-x-harry` |
+| FFNet | Experimental | Character pair filter | Numeric character IDs + pairing checkbox |
+
+**Experimental adapters** may break when sites update their anti-bot measures or internal APIs. They log warnings when access fails and skip gracefully rather than crashing the scan run.
 
 ### Why ao3.py over alternatives
 
@@ -89,9 +118,21 @@ ao3.py is chosen for its explicit `relationship_names` filter in `WorkSearchOpti
     "subject_prefix": "[Archive Scanner]"
   },
   "relationships": [
-    "Character A/Character B",
-    "Character C & Character D"
+    {
+      "site": "ao3",
+      "tag": "Character A/Character B",
+      "track_from": "2026-11-18T10:30:00Z"
+    },
+    {
+      "site": "ao3",
+      "tag": "Character C & Character D",
+      "track_from": "2026-11-01T00:00:00Z"
+    }
   ],
+  "storage": {
+    "mode": "json",
+    "sqlite_path": ""
+  },
   "search": {
     "max_pages": 2,
     "delay_between_requests_seconds": 3
@@ -107,9 +148,13 @@ ao3.py is chosen for its explicit `relationship_names` filter in `WorkSearchOpti
 | `email.from_address` | Sender address for digest emails |
 | `email.to_address` | Recipient address (your inbox) |
 | `email.subject_prefix` | Prefix for email subject lines |
-| `relationships` | List of AO3 relationship tags to monitor (exact tag names as they appear on AO3) |
+| `relationships[].site` | Source site for this tag (e.g., `"ao3"`, `"fimfiction"`) |
+| `relationships[].tag` | Relationship/character tag to monitor (exact tag name as it appears on the source site) |
+| `relationships[].track_from` | ISO 8601 timestamp — only notify on works posted after this date. Set by the user when adding a tag. This is how the scanner avoids flooding you with existing works on first run |
+| `storage.mode` | `"json"` (default, standalone) or `"sqlite"` (shared database with Bibliotheca Fabulae) |
+| `storage.sqlite_path` | Path to the Bibliotheca Fabulae SQLite database file. Only used when mode is `"sqlite"`. If the path is invalid or the file doesn't exist, falls back to JSON with a warning |
 | `search.max_pages` | How many pages of results to check per relationship (each page = 20 works) |
-| `search.delay_between_requests_seconds` | Delay between AO3 requests to avoid rate limiting |
+| `search.delay_between_requests_seconds` | Delay between requests to avoid rate limiting |
 
 ---
 
@@ -117,12 +162,14 @@ ao3.py is chosen for its explicit `relationship_names` filter in `WorkSearchOpti
 
 ```json
 {
-  "Character A/Character B": [12345678, 12345600, 12345590],
-  "Character C & Character D": [12345670, 12345655]
+  "ao3:Character A/Character B": [12345678, 12345600, 12345590],
+  "ao3:Character C & Character D": [12345670, 12345655]
 }
 ```
 
-Each relationship maps to a list of work IDs that have already been seen and notified on. On each run, new work IDs are appended. The file is capped at 500 IDs per relationship to prevent unbounded growth — oldest IDs are trimmed when the cap is exceeded.
+Keys are prefixed with the source site to avoid collisions across sites. Each entry maps to a list of work IDs that have already been seen and notified on. On each run, new work IDs are appended. The file is capped at 500 IDs per relationship to prevent unbounded growth — oldest IDs are trimmed when the cap is exceeded.
+
+When `storage.mode` is `"sqlite"`, the scanner reads/writes to the Bibliotheca Fabulae database instead of this file. The same data is stored in the `SeenWorks` table, keyed by `ScannerTags`.
 
 ---
 
@@ -131,28 +178,33 @@ Each relationship maps to a list of work IDs that have already been seen and not
 ```
 1. LOAD config.json
    │
-2. CREATE ao3.py Client, LOGIN with credentials
+2. INITIALISE site adapters for each unique site in config.relationships
+   │  (AO3: create ao3.py Client, LOGIN with credentials)
+   │  (Other sites: initialise appropriate adapter with auth)
    │
-3. LOAD seen_works.json (create empty if missing)
+3. LOAD state (seen_works.json or SQLite, based on storage.mode)
    │
 4. FOR EACH relationship in config.relationships:
    │
-   ├── BUILD WorkSearchOptions:
-   │     relationship_names = [relationship]
-   │     sort_column = "revised_at"
-   │     sort_direction = "desc"
+   ├── SELECT site adapter based on relationship.site
    │
-   ├── SEARCH via client.work_search_pages()
+   ├── SEARCH via adapter (site-specific implementation):
+   │     AO3: WorkSearchOptions with relationship_names, sorted by revised_at
+   │     Other sites: equivalent tag/character search via adapter
    │     (up to max_pages pages)
    │     (delay between pages per config)
    │
    ├── FOR EACH work in results:
-   │     ├── IF work.id NOT IN seen_works[relationship]:
+   │     ├── IF work.id NOT IN seen_works[relationship]
+   │     │   AND work.date_posted > relationship.track_from:
    │     │     COLLECT: id, title, authors, summary,
    │     │             url, relationships, date_published,
    │     │             nwords, nchapters, is_complete,
    │     │             rating, is_restricted
    │     │     ADD to new_works list
+   │     ├── ELSE IF work.id NOT IN seen_works[relationship]
+   │     │   AND work.date_posted <= relationship.track_from:
+   │     │     ADD work.id to seen_works (mark as seen, no notification)
    │     └── ELSE: SKIP (already seen)
    │
    ├── DELAY between relationships
@@ -162,10 +214,12 @@ Each relationship maps to a list of work IDs that have already been seen and not
    │  │     grouped by relationship
    │  │     with work metadata and direct links
    │  ├── SEND via SMTP
+   │  ├── IF storage.mode == "sqlite":
+   │  │     WRITE discoveries to ScannerDiscoveries table
    │  └── LOG: "Sent digest with N new works"
    │
-6. UPDATE seen_works.json with all new IDs
-   │  (trim to 500 per relationship)
+6. UPDATE state with all new IDs
+   │  (trim to 500 per relationship if JSON mode)
    │
 7. LOG: run summary
 ```
@@ -227,14 +281,24 @@ archive-scanner/
 ├── archive_scanner/
 │   ├── __init__.py
 │   ├── main.py              # Entry point — orchestrates the full run
-│   ├── ao3_client.py         # AO3 login + search logic using ao3.py
+│   ├── config.py             # Load and validate config.json
 │   ├── email_builder.py      # Builds HTML digest email from new works
 │   ├── email_sender.py       # SMTP send logic
-│   ├── state.py              # Load/save seen_works.json
-│   └── config.py             # Load and validate config.json
+│   ├── state.py              # Load/save state (JSON or SQLite based on config)
+│   ├── state_json.py         # JSON file backend for seen_works
+│   ├── state_sqlite.py       # SQLite backend for Bibliotheca Fabulae integration
+│   └── adapters/
+│       ├── __init__.py
+│       ├── base.py           # Abstract SiteAdapter interface
+│       ├── ao3.py            # AO3 adapter (ao3.py library)
+│       ├── fimfiction.py     # Fimfiction adapter (official REST API)
+│       ├── xenforo.py        # SpaceBattles + Sufficient Velocity (RSS feeds)
+│       ├── wattpad.py        # Wattpad adapter (experimental, undocumented API)
+│       ├── quotev.py         # Quotev adapter (experimental, web scraping)
+│       └── ffnet.py          # FFNet adapter (experimental, curl_cffi)
 ├── config.json               # User configuration (gitignored)
 ├── config.example.json       # Example config checked into repo
-├── seen_works.json           # State file (gitignored)
+├── seen_works.json           # State file — JSON mode only (gitignored)
 ├── scanner.log               # Log file (gitignored)
 ├── requirements.txt          # Python dependencies
 ├── run.bat                   # Batch file for Task Scheduler
@@ -252,35 +316,43 @@ archive-scanner/
 ```python
 async def main():
     config = load_config()
-    seen = load_seen_works()
+    state = load_state(config.storage)  # JSON or SQLite based on config
     
-    client = ao3.Client()
-    await client.login(config.ao3.username, config.ao3.password)
+    # Initialise adapters for each unique site in tracked relationships
+    adapters = {}
+    for rel in config.relationships:
+        if rel.site not in adapters:
+            adapters[rel.site] = create_adapter(rel.site, config)
+            await adapters[rel.site].authenticate()
     
     all_new_works = {}
     
-    for ship in config.relationships:
-        options = WorkSearchOptions(
-            relationship_names=[ship],
-            sort_column="revised_at",
-            sort_direction="desc"
-        )
+    for rel in config.relationships:
+        adapter = adapters[rel.site]
+        key = f"{rel.site}:{rel.tag}"
+        seen_ids = state.get_seen(key)
         
         new_works = []
-        async for page in client.work_search_pages(options, start=1, stop=config.search.max_pages + 1):
-            for work in page.results:
-                if work.id not in seen.get(ship, []):
-                    new_works.append(extract_work_info(work))
-            await asyncio.sleep(config.search.delay_between_requests_seconds)
+        results = await adapter.search(rel.tag, config.search.max_pages)
+        
+        for work in results:
+            if work.id not in seen_ids and work.date_posted > rel.track_from:
+                new_works.append(work)
+            elif work.id not in seen_ids:
+                state.mark_seen(key, work.id)  # Pre-track_from, mark seen silently
         
         if new_works:
-            all_new_works[ship] = new_works
+            all_new_works[key] = new_works
+        
+        await asyncio.sleep(config.search.delay_between_requests_seconds)
     
     if all_new_works:
         html = build_digest_email(all_new_works)
         send_email(config, html, total_count(all_new_works))
+        if config.storage.mode == "sqlite":
+            write_discoveries(config.storage.sqlite_path, all_new_works)
     
-    save_seen_works(seen, all_new_works)
+    state.save(all_new_works)
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -314,9 +386,12 @@ pause
 
 ```
 ao3.py
+feedparser
+curl_cffi
+beautifulsoup4
 ```
 
-ao3.py pulls in aiohttp as a transitive dependency. smtplib, email, json, logging, and asyncio are all stdlib — no additional packages needed.
+ao3.py pulls in aiohttp as a transitive dependency. feedparser is used for XenForo RSS (SpaceBattles/SV). curl_cffi is used for FFNet Cloudflare bypass. beautifulsoup4 is used for Quotev scraping. smtplib, email, json, sqlite3, logging, and asyncio are all stdlib.
 
 ---
 
@@ -324,17 +399,21 @@ ao3.py pulls in aiohttp as a transitive dependency. smtplib, email, json, loggin
 
 | Scenario | Behaviour |
 |----------|-----------|
-| AO3 login failure | Log error, exit with code 1. No email sent |
-| AO3 rate limited (HTTP 429) | Log warning, skip remaining searches for this run, send digest of whatever was found so far |
-| AO3 request timeout | Log warning, skip that relationship, continue with others |
-| SMTP connection failure | Log error, exit with code 1. seen_works.json is NOT updated so the same works will be retried next run |
+| Site adapter login failure | Log error for that site, skip its relationships, continue with other sites |
+| Site rate limited (HTTP 429) | Log warning, skip remaining searches for that site this run, send digest of whatever was found so far |
+| Site request timeout | Log warning, skip that relationship, continue with others |
+| Experimental adapter failure (Cloudflare block, API change) | Log warning with "experimental adapter" note, skip that site, continue with stable sites |
+| SMTP connection failure | Log error, exit with code 1. State is NOT updated so the same works will be retried next run |
 | config.json missing | Log error, exit with code 1 |
 | config.json invalid | Log error with details, exit with code 1 |
-| seen_works.json missing | Create empty state, treat all found works as new |
-| seen_works.json corrupted | Log warning, reset to empty state |
+| config.json has relationship with missing `track_from` | Log error, skip that relationship with clear message explaining `track_from` is required |
+| seen_works.json missing (JSON mode) | Create empty state — `track_from` dates prevent false notifications for existing works |
+| seen_works.json corrupted (JSON mode) | Log warning, reset to empty state — `track_from` dates prevent false notifications |
+| SQLite database not found (SQLite mode) | Log error, fall back to JSON mode with warning |
+| SQLite database locked (SQLite mode) | Log warning, retry once after 5 seconds, skip if still locked |
 | No new works found | Log info, exit cleanly. No email sent |
 
-The critical design choice: **seen_works.json is only updated after a successful email send**. This ensures that if the email fails, the same works will be picked up on the next run.
+The critical design choice: **state is only updated after a successful email send**. This ensures that if the email fails, the same works will be picked up on the next run.
 
 ---
 
@@ -356,36 +435,54 @@ Log levels:
 
 ### Phase 1: Foundation
 1. Create project structure and virtual environment
-2. Implement `config.py` — load and validate `config.json`
-3. Implement `state.py` — load/save `seen_works.json` with ID cap
-4. Create `config.example.json`
-5. Set up logging with `RotatingFileHandler`
+2. Implement `config.py` — load and validate `config.json` (new format with site/tag/track_from objects, storage config)
+3. Implement adapter base class (`adapters/base.py`) — abstract `SiteAdapter` interface
+4. Implement dual state backend (`state.py`, `state_json.py`, `state_sqlite.py`) — load/save seen works via JSON or SQLite based on config
+5. Create `config.example.json` (new format)
+6. Set up logging with `RotatingFileHandler`
 
-### Phase 2: AO3 Integration
-6. Implement `ao3_client.py` — login, search by relationship, extract work metadata
-7. Handle rate limiting (429 detection, delays between requests)
-8. Wire into `main.py` with the async polling loop
+### Phase 2: AO3 Adapter
+7. Implement `adapters/ao3.py` — login, search by relationship, extract work metadata, tag validation
+8. Handle rate limiting (429 detection, delays between requests)
+9. Wire into `main.py` with the async polling loop and `track_from` date filtering
 
 ### Phase 3: Email
-9. Implement `email_builder.py` — HTML digest template with inline CSS
-10. Implement `email_sender.py` — configurable SMTP with TLS/SSL support
-11. Wire email send into `main.py` after successful search
+10. Implement `email_builder.py` — HTML digest template with inline CSS (grouped by site and tag)
+11. Implement `email_sender.py` — configurable SMTP with TLS/SSL support
+12. Wire email send into `main.py` after successful search
 
-### Phase 4: Scheduling & Polish
-12. Create `run.bat` and `setup_scheduler.bat`
-13. Add `.gitignore` (config.json, seen_works.json, scanner.log, __pycache__, venv)
-14. Create README.md with setup instructions
-15. End-to-end testing
+### Phase 4: Tier 1 Site Adapters
+13. Implement `adapters/fimfiction.py` — OAuth2 auth, official REST API, character tag search
+14. Implement `adapters/xenforo.py` — RSS feed parsing for SpaceBattles and Sufficient Velocity
+15. Verify all Tier 1 adapters work end-to-end with digest email
+
+### Phase 5: Tier 2 Site Adapters (Experimental)
+16. Implement `adapters/wattpad.py` — undocumented internal API, freeform tag search
+17. Implement `adapters/quotev.py` — web scraping, freeform tag search
+18. Implement `adapters/ffnet.py` — curl_cffi Cloudflare bypass, character pair filter
+19. Add graceful failure handling for experimental adapters (skip on failure, log warning, continue)
+
+### Phase 6: Scheduling & Polish
+20. Create `run.bat` and `setup_scheduler.bat`
+21. Add `.gitignore` (config.json, seen_works.json, scanner.log, __pycache__, venv)
+22. Create README.md with setup instructions (covering all supported sites, auth requirements, track_from setup)
+23. End-to-end testing across all adapters
 
 ---
 
 ## 14. Verification
 
-1. **Config validation**: Run with a missing config, an invalid config (bad JSON, missing fields), and a valid config — verify correct error messages or successful load
-2. **AO3 login**: Run with correct credentials — verify login succeeds and restricted works appear in results. Run with wrong credentials — verify clean error
-3. **Search accuracy**: Manually check AO3 for a known relationship tag, compare script results against the web UI. Confirm restricted works are included
-4. **State tracking**: Run once to populate seen_works.json. Add a fic manually to AO3 search results (or remove an ID from seen_works.json). Run again — verify only the "new" work triggers a notification
-5. **Email delivery**: Send a test digest to your inbox. Verify the HTML renders correctly in your email client, links work, restricted indicator shows
-6. **SMTP flexibility**: Test with at least one SMTP provider to confirm the configurable approach works
-7. **Task Scheduler**: Create the scheduled task via `setup_scheduler.bat`. Verify it appears in Task Scheduler. Wait for one triggered run and check `scanner.log` for a successful execution
-8. **Error resilience**: Kill the SMTP connection mid-send — verify seen_works.json was not updated and the next run re-finds the same works
+1. **Config validation**: Run with a missing config, an invalid config (bad JSON, missing fields), a relationship missing `track_from`, and a valid config — verify correct error messages or successful load
+2. **AO3 adapter**: Run with correct credentials — verify login succeeds and restricted works appear in results. Run with wrong credentials — verify clean error
+3. **Fimfiction adapter**: Register OAuth2 app, search by character tags — verify results match the site's web UI
+4. **XenForo adapter**: Monitor a SpaceBattles creative writing tag via RSS — verify new threads are detected
+5. **Experimental adapters**: Test Wattpad/Quotev/FFNet — verify they return results when working and fail gracefully when blocked
+6. **track_from filtering**: Add a tag with `track_from` set to yesterday. Verify only works posted after yesterday trigger notifications, even if older unseen works appear in results
+7. **Search accuracy**: Manually check AO3 for a known relationship tag, compare script results against the web UI. Confirm restricted works are included
+8. **State tracking (JSON mode)**: Run once to populate seen_works.json. Remove an ID from seen_works.json. Run again — verify the work is NOT re-flagged as new (because `date_posted` < `track_from`)
+9. **State tracking (SQLite mode)**: Configure SQLite mode, point to a test database. Verify discoveries are written to the ScannerDiscoveries table
+10. **Email delivery**: Send a test digest to your inbox. Verify the HTML renders correctly, links work, restricted indicator shows, works are grouped by site and tag
+11. **SMTP flexibility**: Test with at least one SMTP provider to confirm the configurable approach works
+12. **Task Scheduler**: Create the scheduled task via `setup_scheduler.bat`. Verify it appears in Task Scheduler. Wait for one triggered run and check `scanner.log` for a successful execution
+13. **Error resilience**: Kill the SMTP connection mid-send — verify state was not updated and the next run re-finds the same works
+14. **Adapter failure isolation**: Disable network access for one site — verify other sites' scans complete normally
