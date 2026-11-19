@@ -13,7 +13,7 @@ This is an idea to allow remote monitoring and control over the server backup to
 ### Installer
 This idea is to make configuration and setup of the suite easier. It will allow a user to install the SBT and go through the complex configuration in a user friendly manner. If you select the API install, it will go through that configuration process also. The installer will also have an option to update, uninstall or edit configuration details so the user doesn't have to manually update binaries.
 
-## AO3 Archive Scanner
+## AO3 Archive Scanner (In Development)
 This Python project uses a users details and specified relationship tags to alert configured users when new fanfictions are added for that tag. An alert is sent in the form of an email with a breakdown of the fics added. It uses the office AO3 python client for the connection to the data and reading of the relationship tags.
 
 ## Wiki Site
@@ -67,6 +67,12 @@ Translating English to fictional languages like Kryptonian or making it accented
 
 ## Home Bills Tracker
 A website where you can track bills related to home owning/renting such as food shopping, gas, water, council tax etc. Here you scan receipts, enter information and build a history of the expendature of the property. It runs analytics on the entered data to help people better understand their household. You can build shopping lists to predict expendature as well as predict bill price based on past information.
+
+## Stark Table
+A normal looking coffee table hiding a hidden touchscreen monitor running custom software for designing things and viewing of maps. It has an optional future integration with the virtual assistant project which allows you to use the assistant to control operations on the table.
+
+## Library of Tales
+A website where you can organise and view the fan fiction in your private archive. It works by using your connected accounts to download bookmarked or favourited fics for private viewing along with a built in narator. The site also integrates with the archive scanner to scan for tag updates on a limited number of sites.
 
 ## Bones and Brew (£)
 ### Summary
