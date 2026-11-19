@@ -100,7 +100,7 @@ User: "Order me a pepperoni pizza from Dominos"
 |  +---------+ +----+-----+ +-------------------+   |
 |                   |                                |
 |  +----------------+----------------------------+   |
-|  | Skills                                      |   |
+|  | Skills (+ dynamic skills from clients)      |   |
 |  +---------------------------------------------+   |
 |  +----------+ +----------+ +-----------------+     |
 |  | Whisper  | | Piper    | | Asterisk (SIP)  |     |
@@ -109,15 +109,16 @@ User: "Order me a pepperoni pizza from Dominos"
 |  +------------------------------------------+      |
 |  | Sync API + File Store                     |      |
 |  +------------------------------------------+      |
-+----------------+--------------------------------+
-                 | Cloudflare Tunnel
-       +---------+----------+
-       v         v          v
-  +--------+ +--------+ +------+
-  |Desktop | |Telegram| |SIP   |
-  |Client  | |(any    | |Call  |
-  |        | |device) | |      |
-  +--------+ +--------+ +------+
++--------+-------+--------------------------------+
+         |       | Cloudflare Tunnel
+    LAN  |       +---------+----------+
+         v       v         v          v
+  +--------+ +--------+ +--------+ +------+
+  |Stark   | |Desktop | |Telegram| |SIP   |
+  |Table   | |Client  | |(any    | |Call  |
+  |(remote | |        | |device) | |      |
+  |client) | |        | |        | |      |
+  +--------+ +--------+ +--------+ +------+
 ```
 
 ---
@@ -130,6 +131,7 @@ User: "Order me a pepperoni pizza from Dominos"
 | Telegram bot to home server | Needs internet | Out, have data |
 | Offline mobile app (tiny model) | None needed | Out, no data |
 | SIP call-in | Phone signal only | Out, no data, voice only |
+| Stark Table (remote client) | LAN to home server | At home, design workspace with voice control (Section 36) |
 
 ---
 
@@ -283,7 +285,7 @@ Skills declare their **connectivity requirement** (offline/online) and **default
 
 ### Later Skills (15)
 
-Skills to be added post-MVP. Each depends on specific phases of the core roadmap being complete. Full detail in Section 36.
+Skills to be added post-MVP. Each depends on specific phases of the core roadmap being complete. Full detail in Section 37.
 
 | # | Skill | Depends on | Online |
 |---|---|---|---|
@@ -310,6 +312,14 @@ When an online-required skill is requested offline:
 - The assistant explains it cannot perform the action due to lack of internet
 - Asks if it should queue the action for when connectivity returns
 - Users can pre-configure in preferences which online skills auto-queue (assistant won't ask about those, just queues silently)
+
+### Dynamic Skill Registration
+
+Connected client devices can register additional skills with the skill router at runtime. When a device connects, it advertises a set of skills (name, description, parameter schema, applicable context). These skills are added to the router and become available for the LLM to invoke. When the device disconnects, the skills are removed.
+
+The first use of this pattern is the Stark Table (Section 36), which registers mode-aware design skills (3D modelling, mapping, diagramming, drawing, export) when it connects. The pattern is general-purpose and could apply to future connected hardware.
+
+Dynamically registered skills follow the same `ISkill` interface contract. The assistant sends structured commands to the client device's API; the device handles execution.
 
 ---
 
@@ -502,6 +512,8 @@ At the end of each conversation (or periodically during long ones), the LLM revi
 | Critical | Speaks immediately | Speaks immediately | Overrides focus mode, speaks | Phone call (SIP) + repeated |
 
 Critical urgency is reserved for genuine emergencies. It overrides focus mode unconditionally. The LLM content analysis layer can escalate to Critical (e.g. "your dad is in hospital"). Users can also mark specific skills or sources as Critical.
+
+**Excluded surfaces:** The Stark Table (Section 36) is excluded from notification routing entirely. It is a design workspace and notifications are never routed to it.
 
 ### Urgency Determination (three layers)
 
@@ -1891,7 +1903,7 @@ VirtualAssistant/
 - SearXNG and LibreTranslate setup
 - OSRM with map data
 - Offline/online categorisation and queue behaviour
-- Phase 5 also unblocks later skills that depend on external API infrastructure: food ordering assistance, news briefing, package tracking, space tracking, smart home control, travel assistance, and HomeBillsTracker integration (see Section 36)
+- Phase 5 also unblocks later skills that depend on external API infrastructure: food ordering assistance, news briefing, package tracking, space tracking, smart home control, travel assistance, and HomeBillsTracker integration (see Section 37)
 
 ### Phase 6 — Proactive Behaviour
 
@@ -1960,36 +1972,272 @@ VirtualAssistant/
 
 ## 32. Future: Car Assistant Edition
 
-Purpose-built, stripped-down edition for in-car use.
+Purpose-built, stripped-down edition for in-car use. Independently powered — does not draw from the car battery. An always-on ESP32 sentinel manages power, battery health, and wake triggers while the Pi sleeps.
 
 ### Hardware
 
 | Component | Recommendation | Price |
 |---|---|---|
-| Board | Raspberry Pi 5 (8 GB) | ~75 GBP |
-| Storage | 256 GB microSD or NVMe SSD | ~25-35 GBP |
-| Microphone | USB conference mic or wired lavalier | ~15-25 GBP |
-| Speaker | Car aux/Bluetooth or dedicated | ~0-15 GBP |
-| Display | Small LCD (3.5-5 inch) | ~20-35 GBP |
-| OBD-II adapter | ELM327 Bluetooth or USB | ~10-15 GBP |
-| GPS module | USB GPS dongle | ~10-15 GBP |
-| Power | 12V to 5V USB-C car adapter | ~5-10 GBP |
-| Case | 3D printed enclosure | ~2-5 GBP |
-| **Total** | | **~165-230 GBP** |
+| Board | Raspberry Pi 5 (8 GB) | ~£75 |
+| Storage | 256 GB microSD or NVMe SSD | ~£25-35 |
+| Microphone | USB conference mic or wired lavalier | ~£15-25 |
+| Speaker | Car aux/Bluetooth or dedicated | ~£0-15 |
+| Display | Small LCD (3.5-5 inch) | ~£20-35 |
+| OBD-II adapter | ELM327 Bluetooth or USB | ~£10-15 |
+| GPS module | USB GPS dongle | ~£10-15 |
+| ESP32 sentinel | ESP32-S3 DevKit | ~£8 |
+| Battery bays (x3) | 2S2P 21700 packs (see Power System) | ~£85-95 |
+| Home charging dock | TP5100 module + USB-C breakout + 3D printed cradle | ~£8-10 |
+| Physical wake button | Momentary push button | ~£1 |
+| Case | 3D printed enclosure | ~£5-10 |
+| **Total** | | **~£265-340** |
+
+### Power System
+
+The car assistant runs entirely on its own battery power. It does not draw from the car's 12V battery at any point. This prevents any risk of draining the car battery and allows the assistant to continue running when the car is off.
+
+#### Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  ESP32 Sentinel (always on, ~8-20mA)                      │
+│                                                           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
+│  │ Bay A    │  │ Bay B    │  │ Bay C    │               │
+│  │ 2S2P    │  │ 2S2P    │  │ 2S2P    │               │
+│  │ 21700   │  │ 21700   │  │ 21700   │               │
+│  │ 74Wh    │  │ 74Wh    │  │ 74Wh    │               │
+│  │          │  │          │  │          │               │
+│  │ MAX17048 │  │ MAX17048 │  │ MAX17048 │  ← I2C fuel  │
+│  │ (I2C    │  │ (I2C    │  │ (I2C    │    gauges     │
+│  │  addr 0) │  │  addr 1) │  │  addr 2) │               │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘               │
+│       │              │              │                     │
+│  ┌────▼──────────────▼──────────────▼────┐               │
+│  │ MOSFET switching (GPIO-controlled)     │               │
+│  │ Make-before-break — seamless switch    │               │
+│  └────────────────┬──────────────────────┘               │
+│                   │                                       │
+│  ┌────────────────▼──────────────────┐                   │
+│  │ 5V/5A Buck Converter              │                   │
+│  │ (7.4V → 5V, ~93% efficiency)     │                   │
+│  └────────────────┬──────────────────┘                   │
+│                   │                                       │
+│  ┌────────────────▼──────────────────┐                   │
+│  │ MOSFET Power Gate (Pi on/off)     │ ← GPIO from ESP32│
+│  └────────────────┬──────────────────┘                   │
+└───────────────────┼───────────────────────────────────────┘
+                    │ 5V/5A USB-C
+              ┌─────▼─────┐
+              │ Pi 5      │
+              │ + LCD     │
+              │ + mic     │
+              │ + GPS     │
+              └───────────┘
+```
+
+#### Battery Bays
+
+Each bay holds a removable 2S2P 21700 lithium-ion pack with its own BMS and fuel gauge.
+
+| Property | Detail |
+|---|---|
+| Cells per bay | 4x Samsung 50E 21700 (5000mAh each) |
+| Configuration | 2S2P — 7.4V nominal, 10,000mAh |
+| Energy per bay | 74Wh (~68Wh usable after converter efficiency) |
+| Bay dimensions | ~55 x 55 x 80mm per bay (cells in 2x2 grid, including BMS, holder, case, and latch) |
+| Bay weight | ~310-330g per bay |
+| BMS | 2S 20A BMS board per bay — over-discharge, over-charge, short circuit protection |
+| Fuel gauge | MAX17048 per bay on separate I2C addresses — reports percentage to ESP32 |
+| Physical mount | Latch/release mechanism — each bay removable while another is active |
+| 3 bays side by side | ~165 x 55 x 80mm (about the length of a TV remote) |
+| Total (3 bays) | ~204Wh usable, ~1kg |
+
+#### Physical Layout
+
+The complete car unit — Pi 5, ESP32 sentinel, 3 battery bays, LCD, and all wiring — fits in a single 3D printed enclosure approximately **250 x 120 x 90mm** (roughly the size of a large hardback book). The battery bays slot into one side with their latch releases accessible from the outside. Mounting options include under the dashboard, in the glovebox, in a centre console cubby, or under a seat.
+
+#### Battery Switching
+
+The ESP32 controls MOSFET switches via GPIO to select which bay is active. Only one bay drains at a time. Switching uses make-before-break — the new bay connects before the old one disconnects, with a small buffer capacitor on the output rail as a safety net. The transition is seamless with no power interruption to the Pi.
+
+#### Drain Priority
+
+The ESP32 maintains a **drain priority queue** that determines which bay drains next. The default priority is A → B → C. When the active bay drops to 5%, the ESP32 switches to the next bay in the queue and sends a notification via the assistant: "Battery A is at 5% — switching to Battery B. You can remove A for recharging."
+
+The user can change the priority at any time:
+
+- "Drain A first, then switch to C, then B" → assistant updates the queue
+- "Switch to C now" → immediate switch regardless of current bay's level
+- "Detach A for recharge" → assistant confirms A is not active, marks bay as removable
+
+#### Battery Check
+
+The user can request a battery status report at any time:
+
+- "Battery check" → "Battery A is at 25%, Battery B is at 100%, Battery C is at 73%. Currently draining A."
+- The assistant can also answer proactively: "Battery B just hit 5%, switched to C. Two batteries need charging."
+
+The ESP32 reads all three fuel gauges via I2C continuously, even while the Pi is shut down. Battery status is synced to the home server when connectivity is available, so the user can ask their desk assistant "how are the car batteries?" without the car Pi being on.
+
+#### Charging
+
+Battery bays are charged at home only — the system does not draw from the car's 12V battery at any point. Remove a depleted bay from the car via the latch release and charge it on a home charging dock.
+
+**Home charging dock:**
+
+| Property | Detail |
+|---|---|
+| Design | 3D printed cradle with spring-loaded contacts matching the bay's power connector |
+| Charge controller | TP5100 2S balance charger module |
+| Input | USB-C — plugs into any USB-C phone charger or power adapter (15W+ recommended) |
+| Charge time | ~2-2.5 hours per bay from empty to full |
+| Indicator | LED — red while charging, green when complete |
+| Cost | ~£8-10 (TP5100 module, USB-C breakout, contacts, 3D printed cradle) |
+| Quantity | One dock is sufficient — charge one bay at a time, swap as needed. A second dock (~£8-10) allows charging two bays simultaneously. |
+
+**Practical routine:** Pull an empty bay, drop it in the dock by the front door or on the desk. Pick up a charged one on the way out. With 3 bays and 3-5 days of runtime under normal use, charging is an infrequent chore.
+
+#### Runtime Estimates
+
+**Continuous active use (Pi on, all peripherals, no shutdown):**
+
+| Bays | Usable Energy | Active Runtime |
+|---|---|---|
+| 1 bay | 68Wh | ~6.8 hours |
+| 2 bays | 136Wh | ~13.6 hours |
+| 3 bays | 204Wh | ~20.4 hours |
+
+**ESP32 sentinel only (Pi shut down):**
+
+| Mode | Power Draw | Duration on 1 Bay | Duration on 3 Bays |
+|---|---|---|---|
+| WiFi idle (home) | ~0.15W | 450+ hours (19 days) | 1,360+ hours (57 days) |
+| BLE scan (away) | ~0.07W | 970+ hours (40 days) | 2,900+ hours (121 days) |
+
+#### Typical Day-to-Night Scenario
+
+| Phase | Duration | Draw | Energy |
+|---|---|---|---|
+| Morning commute (active) | 1h | 10W | 10Wh |
+| Parked at work (Pi shutdown, ESP32 BLE scan) | 9h | ~0.07W | ~0.6Wh |
+| Evening commute (active) | 1h | 10W | 10Wh |
+| Evening errands (active) | 2h | 10W | 20Wh |
+| Overnight park (Pi shutdown, ESP32 WiFi idle) | 10h | ~0.15W | ~1.5Wh |
+| **Total** | **23 hours** | | **~42Wh** |
+
+#### Multi-Day Runtime (all 3 bays, no recharging)
+
+| Daily Active Use | Parked (Pi off) | Energy Per Day | Days on 3 Bays |
+|---|---|---|---|
+| 4 hours | 20 hours | ~40.3Wh | ~5 days |
+| 2 hours (light use) | 22 hours | ~20.3Wh | ~10 days |
+| 1 hour (short commute) | 23 hours | ~10.3Wh | ~19 days |
+
+With typical daily use of ~4 hours active and smart shutdown the rest of the time, all 3 bays last roughly **5 days** without recharging. Light use days (short commutes only) can stretch this to **over a week**. The ESP32's overnight draw is negligible — less than 2Wh across a 10-hour park.
+
+### ESP32 Sentinel
+
+The ESP32-S3 is an always-on microcontroller that manages the car assistant's power and wake behaviour. It draws ~8-20mA depending on mode — negligible against the battery capacity. The Pi may be fully shut down, but the ESP32 is always awake.
+
+#### Responsibilities
+
+| Function | Detail |
+|---|---|
+| Battery monitoring | Reads all 3 MAX17048 fuel gauges via I2C continuously |
+| Battery switching | Controls MOSFET bay selection via GPIO, manages drain priority queue |
+| Pi power control | Controls the MOSFET power gate that supplies 5V to the Pi |
+| Wake management | Listens for wake triggers and boots the Pi when needed |
+| RTC | Built-in RTC for scheduled wake alarms |
+| Battery reporting | Reports battery levels to the home server via WiFi when available |
+| Charge management | Routes car charger power to inactive bays only |
+
+#### Wake Triggers
+
+The ESP32 listens for multiple wake triggers simultaneously. When any trigger fires, it closes the MOSFET power gate, the Pi receives 5V, and boots (~15-20 seconds).
+
+| Trigger | How | When |
+|---|---|---|
+| Scheduled time | ESP32 internal RTC alarm | Overnight — "wake at 7am" |
+| Home WiFi MQTT | ESP32 connects to home WiFi, subscribes to wake topic on home server | Parked at home — remote wake command from any assistant |
+| BLE proximity | ESP32 scans for the user's phone Bluetooth address | Parked away from home — Pi wakes as user approaches the car (~20-30m) |
+| Phone hotspot | ESP32 detects known hotspot SSID, connects, receives queued commands | Parked near user's phone |
+| Ignition detect | Car 12V accessory line monitored via voltage divider on ESP32 GPIO | Standard ignition start |
+| Physical button | Momentary push button wired to ESP32 GPIO | Manual failsafe |
+
+The ESP32 firmware prioritises power-efficient triggers. When parked at home (known WiFi available), it maintains a WiFi MQTT connection. When parked elsewhere, it falls back to periodic BLE scanning (every 5-10 seconds) which uses less power.
 
 ### Boot/Shutdown
 
-- Boots on ignition, launches assistant, KITT dot on screen
-- Shuts down on ignition off with configurable delayed shutdown (default 5 minutes, max 30 minutes)
-- Battery voltage monitoring via OBD-II — auto-shutdown if voltage drops below 12.2V
+#### Boot Sequence
+
+1. Wake trigger fires (any of the six triggers above)
+2. ESP32 closes the MOSFET power gate — Pi receives 5V
+3. Pi boots (~15-20 seconds), launches assistant, KITT dot appears on screen
+4. Pi connects to available network (home WiFi, phone hotspot, or none)
+5. If network available: syncs with home server, executes any queued commands
+6. Assistant greets user with status: "Morning. Battery B at 82%, A and C full."
+
+#### Shutdown Sequence
+
+1. Shutdown trigger fires (see below)
+2. Assistant performs clean shutdown — saves state, syncs if network available
+3. Pi halts
+4. ESP32 opens the MOSFET power gate — Pi loses 5V, draw drops to zero
+5. ESP32 continues monitoring batteries and listening for wake triggers
+
+#### Shutdown Triggers
+
+| Trigger | Behaviour |
+|---|---|
+| Ignition off | Configurable delayed shutdown (default 5 minutes, max 30 minutes). Assistant announces: "Ignition off. Shutting down in 5 minutes." |
+| Voice command | "Goodnight" / "Shut down" / "Go to sleep" — immediate clean shutdown |
+| Idle timeout | No interaction for configurable period (default 30 minutes) — clean shutdown |
+| Battery critical | Last active bay drops below 3% — emergency shutdown to protect cells |
+| Scheduled | ESP32 sets shutdown time — e.g., "shut down at midnight, wake at 7am" |
+
+#### Smart Overnight Shutdown
+
+When the assistant shuts down for the night (by schedule, idle timeout, or voice command), the ESP32 sets a wake alarm on its internal RTC for the user's configured morning time. The Pi draws zero power overnight. The ESP32 continues on minimal power (~0.07-0.15W), monitoring batteries and listening for emergency wake triggers (home WiFi MQTT, BLE proximity).
+
+If the user needs the car unexpectedly (e.g., emergency trip in the middle of the night), the wake trigger chain handles it — remote MQTT command from home, BLE proximity as they approach the car, or the physical button.
+
+### Queued Command Sync
+
+When the car Pi is shut down and unreachable, commands intended for the car assistant are **queued on the home server**. The queue executes when the car Pi next connects.
+
+#### Flow
+
+1. User texts their primary assistant: "Plan a route from work to Leeds General, have it ready on the car"
+2. Primary assistant plans the route immediately, sends it to the user's phone
+3. Home server queues a sync package for the car assistant: route data, any other pending commands
+4. When the car Pi boots and connects (via WiFi at home, or phone hotspot when approaching the car), it pulls the queued commands and executes them
+
+#### What Can Be Queued
+
+- Route pre-loading
+- Preference changes ("set the morning alarm to 6am tomorrow")
+- Drain priority updates ("switch to bay C next")
+- Any command that doesn't require immediate car-side execution
+
+#### Latency
+
+| Scenario | Time from command to car ready |
+|---|---|
+| Car at home, Pi shut down | ~15-20 seconds (MQTT wake + boot + sync) |
+| Car away, user approaching | ~20-40 seconds (BLE wake + boot + hotspot connect + sync) |
+| Car away, user not near car | Queued until next boot |
 
 ### Connectivity
 
-| State | Connection | Available |
-|---|---|---|
-| At home (Wi-Fi) | Home network | Full sync, updates, backups |
-| Driving with hotspot | Phone data | Live traffic, Telegram, weather |
-| Driving no data | Offline | Offline nav, Q&A, car diagnostics |
+| State | Connection | How | Available |
+|---|---|---|---|
+| At home, Pi on | Home WiFi | Pi connects directly | Full sync, updates, backups, live traffic, Telegram |
+| At home, Pi off | Home WiFi (ESP32 only) | ESP32 maintains MQTT connection | Battery reporting, remote wake, queued command notification |
+| Driving with hotspot | Phone data | Pi connects to phone hotspot | Live traffic, Telegram, weather, sync |
+| Driving no data | Offline | None | Offline nav, Q&A, car diagnostics |
+| Parked away, Pi off | None (ESP32 BLE scan) | ESP32 scans for phone proximity | Wake on approach |
+| Parked away, Pi booting | Phone hotspot | Pi connects on boot | Queued command sync |
 
 ### Skills (car-specific)
 
@@ -2006,6 +2254,8 @@ Purpose-built, stripped-down edition for in-car use.
 | General Q&A | No |
 | Timers/reminders | No |
 | Speed alerts | No |
+| Battery check | No |
+| Battery drain priority | No |
 
 ### Display
 
@@ -2017,7 +2267,7 @@ Qwen 2.5 0.5B Q4 (~350 MB) for responsive interaction. Car commands need speed o
 
 ### Sibling Network
 
-The car assistant is a sibling like any other. Syncs with the family server when on home Wi-Fi.
+The car assistant is a sibling like any other. Syncs with the family server when on home Wi-Fi. The ESP32 sentinel can report battery status to the home server independently of the Pi, so other siblings can answer battery queries even when the car Pi is shut down.
 
 ---
 
@@ -2440,7 +2690,7 @@ The crystal gains one additional LED state:
 | Companion device active | Static glow in a distinct colour (differentiable from all other states) |
 | No companion device connected | Normal LED behaviour as defined in Section 17 |
 
-This LED state is shared across all companion device addons (hologram, smart glasses, and any future addons). When any addon takes ownership of visual output or notification delivery, the crystal shows the same "companion device active" indicator — it is not per-device.
+This LED state is shared across all companion device addons (hologram, smart glasses, and any future addons). When any addon takes ownership of visual output or notification delivery, the crystal shows the same "companion device active" indicator — it is not per-device. Note: the Stark Table (Section 36) is a remote client, not a companion device addon, and does not trigger this indicator.
 
 ### Standalone Mode (Multi-Device Edition)
 
@@ -2885,6 +3135,7 @@ The glasses function as a **roaming display layer** that follows the user across
 | Context | Glasses Paired To | Experience |
 |---|---|---|
 | At home, at desk | Desktop (BLE) | Full experience alongside the hologram (if present) |
+| At home, at Stark Table | Desktop (BLE) | Full experience — glasses and table are independent output surfaces for the same assistant. Table handles visual workspace; glasses handle HUD notifications and navigation. |
 | Out and about | Phone (BLE) | Full experience alongside Telegram |
 | In the car (passenger) | Phone (BLE) | Full experience, visual navigation on HUD |
 | In the car (driver) | Phone (BLE) | Audio only, HUD locked out |
@@ -3034,13 +3285,99 @@ Separate from the core roadmap, edition roadmaps, and hologram addon roadmap. Ea
 
 ---
 
-## 36. Later Skills Detail
+## 36. Connected Client: Stark Table
+
+The Stark Table (designed separately in `stark-table-design.md`) connects to the assistant as a **remote display and input client**. The table does not run its own assistant instance. It is a Multi-Device client — the same as the mobile app — connecting to an assistant's server over the local network. The table's mini PC handles all local rendering (Electron UI, Three.js, theme engine, parametric 3D engine) while the assistant on the remote server handles all intelligence (LLM, skills, memory, identity).
+
+The full integration specification is in the Stark Table design document. This section covers the assistant-side implications.
+
+### Client Behaviour
+
+| Property | Detail |
+|---|---|
+| Connection | Multi-Device client, same protocol and auth as the mobile app (Section 26) |
+| Discovery | Uses the same assistant discovery mechanism as the mobile app — family server or Hunter Industries API (Section 14) |
+| Binding | Configured to one assistant in the table's settings. Changeable but not expected to change frequently. |
+| Reconnection | Auto-reconnects when network or assistant server becomes available |
+| Identity | The assistant identifies users at the table via speaker recognition (Section 10). The table's physical fingerprint sensor is for table access only and is not shared with the assistant. |
+
+### Output Routing
+
+When the table is active and connected, it is the **preferred display surface** for visual content. The assistant defaults to showing maps, 3D models, diagrams, and other visual output on the table rather than the desktop or other connected displays.
+
+This preference is **overridable** — the user can say "show that on my desktop" or "pull that up on my phone" to direct output to a specific display. Without an explicit override, the table takes priority when active.
+
+| Display | Priority (table active) | Priority (table inactive/closed) |
+|---|---|---|
+| Stark Table | First — preferred for all visual content | Unavailable |
+| Desktop screen | Second — used when the table can't display the content, or user explicitly requests it | First |
+| Hologram (Section 34) | Supplementary — ambient visual presence alongside other displays | Same |
+| Smart glasses (Section 35) | Independent — connected to the assistant's host device, not the table | Same |
+
+When the table is fully closed (auto-close sequence completed) or powered off, the assistant treats it as unavailable and routes visual output to the next best display with no user intervention.
+
+### Audio Routing
+
+Audio output follows the active display. When the table is the active display surface, the assistant speaks through the table's surface transducers. When another display is active (desktop, hologram), audio routes through that device. This follows the same principle as glasses audio routing — audio goes where the user's attention is.
+
+### Notifications
+
+**The table is excluded from notification routing.** It is a workspace for design and creation. Notifications (messages, reminders, alerts, calendar events) continue through the existing escalation paths (Section 12) — desktop UI, Telegram, glasses, SIP — as if the table does not exist. The table surface is kept clean for the user's work.
+
+### Dynamic Skill Registration
+
+When the table connects to the assistant, it registers a set of **table-specific skills** with the skill router. These skills are available only while the table is connected and active. When the table disconnects or closes, the skills are removed from the router.
+
+This is the first use of dynamic skill registration — a connected client advertising capabilities that the assistant can invoke. The pattern could apply to future connected hardware.
+
+Each table skill declares which table mode(s) it applies to (Maps, 3D Viewer, Diagrams, Drawing). The table reports its current active mode to the assistant so the skill router can resolve ambiguous commands contextually. For example, "zoom into London" routes to the Maps navigation skill in Maps mode but would prompt for clarification in 3D Viewer mode.
+
+The assistant sends structured commands to the table's WebSocket API. The table handles all rendering and execution. The assistant does not need to know how Three.js, Leaflet, or the parametric engine works — it handles intent; the table handles execution.
+
+The full skill catalogue is documented in the Stark Table design document.
+
+### State Coordination
+
+The table's idle timers (screensaver at 5 minutes, dimmed at 15 minutes, auto-close at 30 minutes) run independently. The assistant does not prevent or delay them.
+
+However, the assistant **can wake the table** from screensaver or dimmed states if it needs to display content — for example, the user says "pull up satellite imagery of my location" while the table is in screensaver. The assistant sends a wake command, the table activates, and the content is displayed.
+
+The assistant **cannot open or close the table**. Physical open (magnet → capacitive touch → fingerprint) and close (long-press) are physical-presence-only operations.
+
+### Listening Mode
+
+The table's microphone follows the connected assistant's current listening mode (passive, active, or silent). The table has no independent mic control. If the assistant is in passive mode, the table mic listens for the wake word only. If silent, the table mic is disabled.
+
+### Offline Behaviour
+
+If the assistant's server is unreachable (network down, server offline), the table continues working as a standalone design tool — drawing, 3D modelling, diagrams, and maps (via offline OpenStreetMap) all function normally on the local mini PC. The assistant's floating UI element on the table shows a disconnected state (greyed out). When the server becomes available again, the table auto-reconnects and the assistant resumes.
+
+### Companion Device Indicator
+
+The table is **not** a companion device in the sense defined in Section 34. It does not trigger the Halo AI crystal's "companion device active" LED state. The table is a display client, not an addon that plugs into the assistant's app. The crystal's companion device indicator is reserved for addons (hologram, glasses) that take ownership of notification delivery or plug directly into the assistant's desktop or mobile app.
+
+### Smart Glasses
+
+The table has no glasses support and no Bluetooth adapter for glasses. Smart glasses connect to the assistant's host device (desktop or phone), not the table. When the user is at the table wearing glasses, both the table and the glasses are independent output surfaces for the same remote assistant.
+
+### Edition Compatibility
+
+| Edition | Table Support | Notes |
+|---|---|---|
+| Desktop Only (Edition A) | No | Edition A does not expose a server API for external clients to connect to. The table requires a Multi-Device server. |
+| Multi-Device (Edition B) | Yes | The table connects to the home server as a client, same as the mobile app. |
+| Car edition | No | Different hardware, different purpose. |
+| Droid edition | No | The droid is its own thing. |
+
+---
+
+## 37. Later Skills Detail
 
 Detailed specifications for each post-MVP skill listed in Section 8. These skills are developed after the core 12-phase roadmap reaches the required dependencies.
 
 ---
 
-### 36.1 Food Ordering Assistance
+### 37.1 Food Ordering Assistance
 
 **Depends on:** Phase 5 (external APIs), Phase 2 (memory)
 
@@ -3072,7 +3409,7 @@ Helps the user decide what to order and hands off to the delivery platform for c
 
 ---
 
-### 36.2 News Briefing
+### 37.2 News Briefing
 
 **Depends on:** Phase 5 (external APIs)
 
@@ -3093,7 +3430,7 @@ Curated news summaries from configurable sources. Delivered on-demand or as a mo
 
 ---
 
-### 36.3 Package Tracking
+### 37.3 Package Tracking
 
 **Depends on:** Phase 5 (external APIs)
 
@@ -3120,7 +3457,7 @@ Tracks parcels across multiple carriers from a single conversational interface.
 
 ---
 
-### 36.4 Image Description
+### 37.4 Image Description
 
 **Depends on:** Multimodal model support (vision-capable LLM)
 
@@ -3135,7 +3472,7 @@ Describes the content of an image provided by the user. Requires the LLM strateg
 
 ---
 
-### 36.5 Text Extraction / OCR
+### 37.5 Text Extraction / OCR
 
 **Depends on:** Vision-capable model or dedicated OCR library (Tesseract)
 
@@ -3151,7 +3488,7 @@ Extracts text from images — signs, documents, screenshots, handwritten notes.
 
 ---
 
-### 36.6 NASA Space Skill
+### 37.6 NASA Space Skill
 
 **Depends on:** Phase 7 (personality evolution)
 
@@ -3185,7 +3522,7 @@ Integration with NASA's public APIs for space content — on-demand queries and 
 
 ---
 
-### 36.7 Space Tracking Skill
+### 37.7 Space Tracking Skill
 
 **Depends on:** Phase 5 (external APIs)
 
@@ -3212,7 +3549,7 @@ Tracks the International Space Station, upcoming launches, and space news using 
 
 ---
 
-### 36.8 Daily Briefing
+### 37.8 Daily Briefing
 
 **Depends on:** Phase 6 (proactive behaviour)
 
@@ -3259,7 +3596,7 @@ Modules that depend on later skills not yet installed are simply absent from the
 
 ---
 
-### 36.9 Smart Home Control
+### 37.9 Smart Home Control
 
 **Depends on:** Phase 5 (external APIs)
 
@@ -3302,7 +3639,7 @@ Primary integration target is Home Assistant, which provides a well-documented R
 
 ---
 
-### 36.10 Travel Assistance
+### 37.10 Travel Assistance
 
 **Depends on:** Phase 5 (external APIs)
 
@@ -3333,7 +3670,7 @@ Helps with travel planning, flight tracking, and journey information. Covers bot
 
 ---
 
-### 36.11 Media Recommendations
+### 37.11 Media Recommendations
 
 **Depends on:** Phase 7 (personality evolution)
 
@@ -3356,7 +3693,7 @@ Movie, TV, and book recommendations that learn the user's taste over time. Integ
 
 ---
 
-### 36.12 HomeBillsTracker Integration
+### 37.12 HomeBillsTracker Integration
 
 **Depends on:** Phase 5 (external APIs) + HomeBillsTracker project reaching Phase 7 (API)
 
@@ -3401,7 +3738,7 @@ After surfacing alerts, the assistant marks them as read via `PATCH /api/alerts/
 
 ---
 
-### 36.13 Custom Routines
+### 37.13 Custom Routines
 
 **Depends on:** Phase 5 (full skill set to chain)
 
@@ -3450,7 +3787,7 @@ Startup routines are a specific system behaviour — what happens when the assis
 
 ---
 
-### 36.14 Voicemail Transcription
+### 37.14 Voicemail Transcription
 
 **Depends on:** Phase 8 (SIP telephony)
 
@@ -3483,7 +3820,7 @@ Transcribes and manages voicemails received through the SIP telephony system. Vo
 
 ---
 
-### 36.15 Document Generation
+### 37.15 Document Generation
 
 **Depends on:** Phase 4 (desktop UI for preview and export)
 

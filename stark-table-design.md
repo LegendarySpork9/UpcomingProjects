@@ -486,24 +486,217 @@ A unified mapping hub integrated into the sci-fi UI, with multiple sources acces
 |---|---|
 | Huion EMR pen | Drawing, sketching, precise interaction |
 | PCAP multi-touch | Gestures, pinch-zoom, multi-finger navigation |
-| Virtual assistant | Voice commands, offloads processing to home server (spec in separate session) |
+| Virtual assistant | Voice commands via remote assistant connection (see Virtual Assistant Integration section) |
 | No physical keyboard/mouse | Touch + pen + voice covers all interaction |
 
 ---
 
-## Future Integration
+## Virtual Assistant Integration
 
-### Virtual Assistant
+The table integrates with the Virtual Assistant project (designed separately) as a **remote client**. The table does not run its own assistant instance. It connects over the local network to an assistant running on another machine (desktop, server, etc.) and acts as a display and input surface for that assistant. The table's mini PC handles all local rendering — Electron UI, Three.js, theme engine — while all assistant intelligence (LLM processing, skill execution, memory, identity) lives on the remote assistant's server.
 
-The table will integrate with the Virtual Assistant project (designed separately). The assistant runs on the table's mini PC and offloads heavy processing to the home server.
+This follows the same client architecture as the Multi-Device edition's mobile app. The table is just another client that connects to an assistant's server over the network.
 
-| Feature | Detail |
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Stark Table (Mini PC)                                        │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │ Electron App                                             │  │
+│  │                                                          │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │  │
+│  │  │ Drawing  │  │ Maps     │  │ Diagrams │  │ 3D     │  │  │
+│  │  │ Mode     │  │ Mode     │  │ Mode     │  │ Viewer │  │  │
+│  │  └──────────┘  └──────────┘  └──────────┘  └────────┘  │  │
+│  │                                                          │  │
+│  │  ┌──────────────────────────────────────────────────┐    │  │
+│  │  │ Assistant Client Module                           │    │  │
+│  │  │  - Floating UI element (theme-adaptive)          │    │  │
+│  │  │  - Skill set advertisement                       │    │  │
+│  │  │  - Mode state reporting                          │    │  │
+│  │  │  - Command execution (table API)                 │    │  │
+│  │  └──────────────────┬───────────────────────────────┘    │  │
+│  │                     │                                     │  │
+│  └─────────────────────┼─────────────────────────────────────┘  │
+│                        │ Network (Wi-Fi)                        │
+│  ┌─────────────┐       │        ┌───────────────────┐          │
+│  │ Microphone  │───────┤        │ Surface           │          │
+│  │ (USB array) │       │        │ Transducers       │          │
+│  └─────────────┘       │        └───────────────────┘          │
+└────────────────────────┼───────────────────────────────────────┘
+                         │
+              ┌──────────▼──────────┐
+              │  Assistant Server    │
+              │  (Desktop / Server)  │
+              │                      │
+              │  LLM, Skills, Memory │
+              │  Identity, Routing   │
+              └─────────────────────┘
+```
+
+### Connection
+
+| Property | Detail |
 |---|---|
-| Voice input | Microphone array (USB, flush-mounted in table) |
-| Voice output | Surface transducers |
-| Processing | Local mini PC for lightweight tasks, home server for heavy LLM inference |
-| Network | Wi-Fi to home server |
-| Capabilities | Voice commands for all table functions, 3D model iteration, theme switching, export, map navigation |
+| Protocol | Same as Multi-Device mobile client — connects to the assistant's server API over the local network |
+| Authentication | API key or mutual TLS (as defined in the VirtualAssistant design, Section 26) |
+| Discovery | Assistant discovery via family server or Hunter Industries API — same mechanism as the mobile app |
+| Binding | Configured to one assistant in the table's settings. Changeable, but not expected to change frequently. |
+| Reconnection | Auto-reconnects when network or assistant server becomes available |
+
+### Voice Input
+
+| Property | Detail |
+|---|---|
+| Hardware | USB microphone array, flush-mounted in the table surface |
+| Listening mode | Follows the connected assistant's current listening mode (passive, active, or silent). The table has no independent mic control. |
+| Wake word | Detected on the assistant's server — audio streams from the table mic over the network |
+| Voice commands | Processed by the assistant's normal STT pipeline (Whisper) |
+| Speaker recognition | The assistant identifies the user via its own voiceprint system. The table's fingerprint sensor is for physical table authentication only and is not shared with the assistant. |
+
+### Voice Output
+
+| Property | Detail |
+|---|---|
+| Hardware | Surface transducers (exciters) on the table |
+| Routing | Audio output follows the active display. When the table is the active display surface, the assistant speaks through the table's transducers. When another display is active (desktop, hologram), audio routes through that device instead. |
+
+### Visual Presence
+
+The assistant appears on the table as an **optional persistent floating element** — a small themed indicator (orb, dot, or arc depending on the active theme) visible in every mode. It can be tapped or spoken to without leaving the current mode.
+
+| Property | Detail |
+|---|---|
+| Appearance | Adapts to the active table theme (blue holographic in Stark, neon in Tron, pink/cyan in Cyberpunk, etc.) |
+| Visibility | Toggleable in the table's settings — can be hidden entirely for a clean workspace |
+| States | Active (listening/responding), idle, disconnected (greyed out) |
+| Interaction | Tap to activate, or use wake word. Does not require switching to a dedicated assistant mode. |
+
+### State Coordination
+
+The table's idle timers (screensaver, dimmed, auto-close) run independently. The assistant does not prevent or delay them.
+
+| Scenario | Behaviour |
+|---|---|
+| Table active, assistant idle | Table idle timers run normally |
+| Table idle/screensaver, assistant command requires display | Assistant wakes the table to display content (e.g. "pull up satellite imagery of my location") |
+| Table dimmed, voice command | Assistant wakes the table if the response requires visual output |
+| Table fully closed (auto-close completed) | Assistant treats the table as unavailable. Commands that need a display fall back to the next best output (desktop, hologram, etc.). |
+| Table powered off | Same as fully closed — unavailable |
+| Assistant server unreachable | Table continues working as a standalone design tool. The floating element greys out or shows a disconnected indicator. Auto-reconnects when the server becomes available. |
+
+### Output Priority
+
+When the table is active and connected, it is the **preferred display surface** for visual content. The assistant defaults to showing maps, 3D models, diagrams, and other visual output on the table rather than the desktop or other displays.
+
+This preference is **overridable** — the user can say "show that on my desktop" or "pull that up on my phone" to direct output to a specific display. Without an explicit override, the table takes priority when active.
+
+| Display | Priority (table active) | Priority (table inactive/closed) |
+|---|---|---|
+| Stark Table | First — preferred for all visual content | Unavailable |
+| Desktop screen | Second — used when table can't display the content, or user explicitly requests it | First |
+| Hologram | Supplementary — used alongside other displays for ambient visual presence | Same |
+| Smart glasses | Independent — connected to the assistant's host device, not the table | Same |
+
+### Notifications
+
+**Notifications are not routed to the table.** The table is a workspace for design and creation. Notifications (messages, reminders, alerts) remain on the desktop, phone, or glasses — whichever is the current notification channel. The table surface is kept clean.
+
+### Smart Glasses
+
+**The table has no glasses support.** Smart glasses connect to the assistant's host device (desktop or phone) via Bluetooth, not to the table. When the user is at the table wearing glasses, the glasses are connected to the same assistant through its host device. Both the table and the glasses are independent output surfaces for the same assistant.
+
+### Table Skill Set
+
+When the table connects to the assistant, it registers a set of **table-specific skills** with the assistant's skill router. These skills are available only while the table is connected and active. When the table disconnects or closes, the skills are removed.
+
+Each skill declares which table mode(s) it applies to. The table reports its current active mode to the assistant, so the skill router can match commands to the correct context.
+
+#### Skill Registration
+
+The table's Electron app exposes a local API (WebSocket) that the assistant calls when executing table skills. The assistant handles intent and intelligence; the table handles rendering and execution. The assistant does not need to know how Three.js, Leaflet, or the parametric engine works — it sends structured commands, and the table's app does the work.
+
+#### Mode-Aware Routing
+
+When a voice command could be ambiguous, the assistant uses the current table mode to resolve it:
+
+- "Zoom into London" in Maps mode → `table.maps.navigate_to` skill
+- "Zoom into London" in 3D Viewer → no matching table skill in this context, assistant asks for clarification or offers to switch to Maps
+- "Add a shelf" in 3D Viewer → `table.3d.add_geometry` skill
+- "Add a shelf" in Drawing mode → no matching skill, assistant clarifies
+
+#### Skill Catalogue
+
+**General (all modes):**
+
+| Skill | Example Commands |
+|---|---|
+| Switch mode | "Open the 3D viewer," "go back to the hub," "switch to Maps" |
+| Switch theme | "Switch to Tron mode," "Cyberpunk theme" |
+| Table display control | "Dim the screen," "brighten up" |
+
+**Maps mode:**
+
+| Skill | Example Commands |
+|---|---|
+| Navigate to location | "Show me satellite of London," "zoom into my house" |
+| Change map source | "Switch to OS Maps," "show satellite view," "Bing imagery" |
+| Get directions | "Directions to Manchester," "walking route to the station" |
+
+**3D Viewer / Sketch-to-3D:**
+
+| Skill | Example Commands |
+|---|---|
+| Add geometry | "Add a shelf," "add a drawer unit to the bottom," "add handles" |
+| Remove geometry | "Remove the top shelf," "get rid of the legs" |
+| Modify dimensions | "Make it 20cm wider," "make the top shelf narrower," "double the depth" |
+| Modify shape | "Round the corners," "chamfer the edges," "bevel the top" |
+| Move / reposition | "Move the middle shelf up," "centre the drawer," "shift it left" |
+| Duplicate | "Copy that shelf," "repeat that section three times" |
+| Change material | "Make the shelves oak," "painted white," "brass handles," "walnut finish" |
+| Adjust lighting | "Warmer lighting," "sunset," "studio lighting," "cooler colour temperature" |
+| Toggle detail level | "Show construction detail," "show joints," "back to standard" |
+| Camera / view | "Show me the back," "top-down view," "rotate slowly," "front elevation" |
+| Undo / redo | "Undo that," "go back two steps," "redo" |
+
+**Diagrams mode:**
+
+| Skill | Example Commands |
+|---|---|
+| Add element | "Add a server node," "add a database," "new text label" |
+| Connect elements | "Connect these two," "draw a line between the router and the server" |
+| Modify layout | "Space these out," "align to grid," "centre everything" |
+
+**Drawing mode:**
+
+| Skill | Example Commands |
+|---|---|
+| Shape recognition | "Make that a circle," "straighten that line" |
+| Tool switching | "Switch to the eraser," "pen tool," "select mode" |
+
+**Export (3D Viewer, Drawing, Diagrams):**
+
+| Skill | Example Commands |
+|---|---|
+| Export file | "Export as STL," "save as PDF with dimensions," "DXF for the laser cutter" |
+| Send file | "Send the bookcase files to my phone," "upload to Google Drive," "email the plans" |
+
+Export commands are executed entirely by the table's Electron app. The assistant sends the command; the table handles the file operation.
+
+### Physical Control
+
+The table can only be opened and closed via the physical activation sequence (magnet → capacitive touch → fingerprint) and the physical long-press to close. **The assistant cannot open or close the table remotely.** Security is tied to physical presence.
+
+### Open / Close via Assistant
+
+| Command | Behaviour |
+|---|---|
+| "Open the table" | Not supported — physical activation only |
+| "Close the table" | Not supported — physical long-press only |
+| "Dim the table screen" | Supported — display control via table skill |
+| "Wake the table" | Supported — wakes from screensaver/dimmed if the table is physically open |
 
 ---
 
@@ -529,9 +722,10 @@ The table will integrate with the Virtual Assistant project (designed separately
 | Power distribution (multi-socket, fuses, wiring) | ~£30-50 |
 | Screen protector films (pack) | ~£15-30 |
 | Silicone gasket material | ~£10-20 |
+| USB microphone array (flush-mount) | ~£30-60 |
 | USB extension + flush mount port | ~£10-20 |
 | Miscellaneous (cables, cable management, fasteners) | ~£50-100 |
-| **Total estimated hardware cost** | **~£3,955 - £5,540** |
+| **Total estimated hardware cost** | **~£3,985 - £5,600** |
 
 Software development is Toby's time — no external cost.
 
@@ -553,4 +747,4 @@ Software development is Toby's time — no external cost.
 | 1 | Physical build — table, motorised frame, sliding mechanism, monitor lift, activation sequence, safety sensors |
 | 2 | Sci-fi UI shell — Electron app, theme engine, hub/launcher, drawing canvas, diagram tools |
 | 3 | Sketch-to-3D pipeline — parametric engine, 3D viewer, PBR materials, lighting, export |
-| 4 | Virtual assistant integration |
+| 4 | Virtual assistant integration — assistant client module in Electron app, network connection to remote assistant, skill set registration and table API (WebSocket), floating UI element with theme adaptation, mode-aware command routing, audio input/output wiring (mic array + transducers), offline fallback (greyed-out state, standalone table operation) |
